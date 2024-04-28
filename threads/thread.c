@@ -210,6 +210,8 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	schedule_preemption();
+
 	return tid;
 }
 
@@ -243,7 +245,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	// list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -306,7 +309,8 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
+		// list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -365,12 +369,31 @@ bool cmp_wake_up_tick(const struct list_elem *cmp_elem, const struct  list_elem 
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	schedule_preemption();
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
+}
+
+/* priority schedule */
+bool cmp_priority(const struct list_elem  *cmp_elem, const struct list_elem  *list_elem, void *aux UNUSED) {
+	struct thread *cmp_thread = list_entry(cmp_elem, struct thread,	elem);
+	struct thread *list_thread = list_entry(list_elem, struct thread, elem);
+	
+	if (cmp_thread->priority > list_thread->priority)
+		return true;
+	return false;
+}
+
+void schedule_preemption(void) {
+	struct thread *curr = running_thread();
+	struct list_elem *max_priority = list_begin(&ready_list);
+
+	if (!cmp_priority(&curr->elem, &max_priority, NULL)) 
+		thread_yield();
 }
 
 /* Sets the current thread's nice value to NICE. */

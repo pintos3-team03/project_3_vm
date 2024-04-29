@@ -28,6 +28,9 @@ bool lock_try_acquire (struct lock *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
 
+/* sema compare */
+bool cmp_sema_priority (const struct list_elem  *cmp_elem, const struct list_elem  *list_elem, void *aux);
+
 /* Condition variable. */
 struct condition {
 	struct list waiters;        /* List of waiting threads. */

@@ -390,7 +390,8 @@ bool cmp_priority(const struct list_elem  *cmp_elem, const struct list_elem  *li
 }
 
 void schedule_preemption(void) {
-	struct thread *curr = running_thread();
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
 	struct list_elem *max_priority = list_begin(&ready_list);
 
 	if (!cmp_priority(&curr->elem, &max_priority, NULL)) 
@@ -408,7 +409,8 @@ bool cmp_donations (const struct list_elem  *cmp_elem, const struct list_elem  *
 }
 
 void donate_priority(void) {
-	struct thread *curr = running_thread();
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
 	struct thread *next = curr->wait_on_lock->holder;
 	int cnt = 0;
 
@@ -418,14 +420,20 @@ void donate_priority(void) {
 			break;
 
 		next->priority = curr->priority;
-		next = next->wait_on_lock->holder;
-		cnt += 1;
+
+		if (next->wait_on_lock) {
+			next = next->wait_on_lock->holder;
+			cnt += 1;
+		}
+		else
+			break;
 	}
 }
 
 /* 락 놔줄 때 락 기다리고 있던 donations 지우기 */
 void remove_with_lock(struct lock *lock) {
-	struct thread *curr = running_thread();
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
 	struct list_elem *donation = list_begin(&curr->donations);
 
 	while (donation) {
@@ -436,7 +444,8 @@ void remove_with_lock(struct lock *lock) {
 }
 
 void refresh_priority(void) {
-	struct thread *curr = running_thread();
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
 	curr->priority = curr->init_priority;
 
 	if (list_empty(&curr->donations))

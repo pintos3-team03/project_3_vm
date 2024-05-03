@@ -394,7 +394,10 @@ void schedule_preemption(void) {
 	struct thread *curr = thread_current();	
 	struct list_elem *max_priority = list_begin(&ready_list);
 
-	if (!cmp_priority(&curr->elem, &max_priority, NULL)) 
+	if (list_empty(&ready_list))
+		return;
+
+	if (!intr_context() && !cmp_priority(&curr->elem, &max_priority, NULL)) 
 		thread_yield();
 }
 

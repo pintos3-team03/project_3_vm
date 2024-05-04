@@ -452,7 +452,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		extend_rsp -= 8;
 		memcpy(extend_rsp, &temp_rsp, 8);
 
-		*(token - 1) = '\0';
+		while (*(token - 1) == ' ') {
+			token -= 1;
+			*token = '\0';
+		}
 		token = strrchr(next_ptr, ' ');
 		cnt += 1;
 	}

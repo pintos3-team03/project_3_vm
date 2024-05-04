@@ -488,6 +488,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	printf("%s\n", parsing_ptr);
 
 	if_->R.rdi = cnt; // 파싱 개수 rdi에 넣어줌
+	if_->R.rsi = extend_rsp; // rsi가 argv의 주소를 가리키게 설정
 
 	printf("확장한 스택 포인터 %p\n", extend_rsp);
 	if_->rsp = extend_rsp;

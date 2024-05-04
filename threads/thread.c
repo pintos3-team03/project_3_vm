@@ -210,6 +210,8 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	schedule_preemption();
+
 	return tid;
 }
 
@@ -243,7 +245,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	// list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -306,7 +309,8 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
+		// list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -364,13 +368,97 @@ bool cmp_wake_up_tick(const struct list_elem *cmp_elem, const struct  list_elem 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	thread_current ()->init_priority = new_priority;
+	refresh_priority();
+	schedule_preemption();
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
+}
+
+/* priority schedule */
+bool cmp_priority(const struct list_elem  *cmp_elem, const struct list_elem  *list_elem, void *aux UNUSED) {
+	struct thread *cmp_thread = list_entry(cmp_elem, struct thread,	elem);
+	struct thread *list_thread = list_entry(list_elem, struct thread, elem);
+	
+	if (cmp_thread->priority > list_thread->priority)
+		return true;
+	return false;
+}
+
+void schedule_preemption(void) {
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
+	struct list_elem *max_priority = list_begin(&ready_list);
+
+	if (list_empty(&ready_list))
+		return;
+
+	if (!intr_context() && !cmp_priority(&curr->elem, &max_priority, NULL)) 
+		thread_yield();
+}
+
+/* donations compare */
+bool cmp_donations (const struct list_elem  *cmp_elem, const struct list_elem  *list_elem, void *aux) {
+	struct thread *cmp_thread = list_entry(cmp_elem, struct thread,	donation_elem);
+	struct thread *list_thread = list_entry(list_elem, struct thread, donation_elem);
+	
+	if (cmp_thread->priority > list_thread->priority)
+		return true;
+	return false;
+}
+
+void donate_priority(void) {
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
+	struct thread *next = curr->wait_on_lock->holder;
+	int cnt = 0;
+
+	while (next) {
+		// nested 8단계 확인
+		if (cnt == 8)
+			break;
+
+		next->priority = curr->priority;
+
+		if (next->wait_on_lock) {
+			next = next->wait_on_lock->holder;
+			cnt += 1;
+		}
+		else
+			break;
+	}
+}
+
+/* 락 놔줄 때 락 기다리고 있던 donations 지우기 */
+void remove_with_lock(struct lock *lock) {
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
+	struct list_elem *donation = list_begin(&curr->donations);
+
+	while (donation) {
+		if (list_entry(donation, struct thread, donation_elem)->wait_on_lock == lock) 
+			list_remove(donation);
+		donation = donation->next;
+	}
+}
+
+void refresh_priority(void) {
+	// struct thread *curr = running_thread();
+	struct thread *curr = thread_current();	
+	curr->priority = curr->init_priority;
+
+	if (list_empty(&curr->donations))
+		return;	
+
+	list_sort(&curr->donations, cmp_donations, NULL);
+	
+	int max_priority = list_entry(list_begin(&curr->donations), struct thread, donation_elem)->priority;
+	if (curr->priority < max_priority)
+		curr->priority = max_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -461,6 +549,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *); // 스택 포인터 설정
 	t->priority = priority;
+	t->init_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
 	t->magic = THREAD_MAGIC;
 }
 

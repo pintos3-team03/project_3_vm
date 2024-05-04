@@ -345,12 +345,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
-	/* Parsing */
-	printf("========\nfile_name: %s\n========\n", file_name);
-	printf("=====파싱 중=====\n");
-	// 1. argv 전체 길이 먼저 찾기
+	/* file name 찾기 */
 	parsing_ptr = strtok_r(file_name, " ", &next_ptr);
-	printf("%s\n", parsing_ptr);	
 
 	/* Open executable file. */
 	file = filesys_open (parsing_ptr);
@@ -431,36 +427,30 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	// 1. 스택 크기 늘려주기 (첫 푸시 전에 8의 배수로 맞춰주기)
-	// 이전 rsp 저장해두기
-	printf("===============\nrsp: %p\n", if_->rsp);
-	temp_rsp = if_->rsp;
+	/* passing */
+	// 스택 크기 늘려주기 (첫 푸시 전에 8의 배수로 맞춰주기)
+	temp_rsp = if_->rsp; // 이전 rsp 저장
 	size_argv = strlen(parsing_ptr) + 1 + strlen(next_ptr) + 1;
 	if (size_argv % 8 != 0)
 		size_argv = ((size_argv / 8) + 1) * 8;
 	extend_rsp = if_->rsp - size_argv;
-	printf("===============\nextned_rsp: %p\n", extend_rsp);
 	
-	// 2. 파싱한 데이터 넣기
-	printf("====경로 빼고 파싱\n");
+	// 명령어 파싱
 	char *token = strrchr(next_ptr, ' ');
 
 	// 경계 설정
 	printf("%p\n", extend_rsp);
 	extend_rsp -= 8;
 	*extend_rsp = 0;
-	// 데이터 넣고 주소도 넣기
+
+	// 파싱 데이터 푸시, 해당 데이터 주소도 스택에 푸시
 	while (token) {
 		token += 1;
-		printf("%s\n", token, strlen(token));
 		
 		temp_rsp -= strlen(token) + 1;
 		memcpy(temp_rsp, token, strlen(token) + 1);
 		extend_rsp -= 8;
 		memcpy(extend_rsp, &temp_rsp, 8);
-		printf("주소 들어갈 곳 %p\n", extend_rsp);
 
 		*(token - 1) = '\0';
 		token = strrchr(next_ptr, ' ');
@@ -468,14 +458,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 	token = next_ptr;
 	cnt += 1;
-	printf("%s\n", token);
-	printf("cnt = %d\n", cnt);
 	temp_rsp -= strlen(token) + 1;
 	memcpy(temp_rsp, token, strlen(token) + 1);
 	extend_rsp -= 8;
 	memcpy(extend_rsp, &temp_rsp, 8);
 
-	// 파일 경로도 스택에 푸시
+	// 먼저 찾아둔 file name(경로)도 스택에 푸시
 	temp_rsp -= strlen(parsing_ptr) + 1;
 	memcpy(temp_rsp, parsing_ptr, strlen(parsing_ptr) + 1);
 	// 데이터 패딩 0으로 초기화
@@ -485,19 +473,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 	extend_rsp -= 8;
 	memcpy(extend_rsp, &temp_rsp, 8);
-	printf("%s\n", parsing_ptr);
 
-	if_->R.rdi = cnt; // 파싱 개수 rdi에 넣어줌
+	if_->R.rdi = cnt; // 파싱 개수 rdi에 넣어줌 (argc 설정)
 	if_->R.rsi = extend_rsp; // rsi가 argv의 주소를 가리키게 설정
-
-	printf("확장한 스택 포인터 %p\n", extend_rsp);
 	if_->rsp = extend_rsp;
 
-	// 확인
-	// char **test = extend_rsp;
-	// for (i = 0; i < 4; i++) {
-	// 	printf("stack_address: %p, adress: %p\n", test + (i * 1), *(test + (i * 1)));
-	// }
 	hex_dump(if_->rsp, if_->rsp, size_argv + ((cnt + 2) * 8), true);
 	success = true;
 

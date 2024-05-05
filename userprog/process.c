@@ -439,7 +439,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *token = strrchr(next_ptr, ' ');
 
 	// 경계 설정
-	printf("%p\n", extend_rsp);
 	extend_rsp -= 8;
 	*extend_rsp = 0;
 
@@ -479,9 +478,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	if_->R.rdi = cnt; // 파싱 개수 rdi에 넣어줌 (argc 설정)
 	if_->R.rsi = extend_rsp; // rsi가 argv의 주소를 가리키게 설정
+	// return address 설정
+	extend_rsp -= 8;
+	*extend_rsp = 0;
 	if_->rsp = extend_rsp;
 
-	hex_dump(if_->rsp, if_->rsp, size_argv + ((cnt + 2) * 8), true);
+	hex_dump(if_->rsp, if_->rsp, size_argv + ((cnt + 3) * 8), true);
 	success = true;
 
 done:

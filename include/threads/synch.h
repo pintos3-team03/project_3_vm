@@ -22,6 +22,8 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 };
 
+static struct lock filesys_lock; /* 파일에 대한 동시 접근 제어용 */
+
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);
 bool lock_try_acquire (struct lock *);

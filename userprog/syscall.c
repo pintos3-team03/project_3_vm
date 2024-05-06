@@ -9,6 +9,7 @@
 #include "intrinsic.h"
 #include "threads/init.h"
 #include "filesys/filesys.h"
+#include "threads/synch.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -37,6 +38,8 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+	lock_init(&filesys_lock);
 }
 
 static bool
@@ -83,14 +86,13 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = open(f->R.rdi);
 			break;
 		case SYS_FILESIZE:
-			// f->R.rax = filesize();
+			f->R.rax = filesize(f->R.rdi);
 			break;
 		case SYS_READ:
-			// f->R.rax = read();
+			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_WRITE:
-			// f->R.rax = write();
-			printf("%s", f->R.rsi);
+			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
 			// f->R.rax = seek();
@@ -159,13 +161,63 @@ open (const char *file) {
 	return -1;
 }
 
-int read (int fd, void *buffer, unsigned length) {
+int filesize (int fd) {
+	if (!fd || fd > 128)
+		exit(-1);
 	
+	struct file *open_file = thread_current()->fd_table[fd];
+	if (open_file) 
+		return file_length(open_file);
+	return -1;
+}
+
+int read (int fd, void *buffer, unsigned length) {
+	if (!fd || fd > 128 || !check_address(buffer))
+		exit(-1);
+
+	if (fd == 0) {
+		int count = 0;
+		char *temp_buf = buffer;
+		for (int i = 0; i < length; i++) {
+			*temp_buf = input_getc();
+			count++;
+			if (*temp_buf == '\0')
+				break;
+			temp_buf++;
+		}
+		return count;
+	}
+
+	lock_acquire(&filesys_lock);
+	struct file *open_file = thread_current()->fd_table[fd];
+	if (open_file) {
+		off_t read_bytes = file_read(open_file, buffer, length);
+		lock_release(&filesys_lock);
+		return read_bytes;
+	}
+	lock_release(&filesys_lock);
+	return -1;
 }
 
 int
 write (int fd, const void *buffer, unsigned length) {
+	if (!fd || fd > 128 || !check_address(buffer))
+		exit(-1);
 
+	if (fd == 1) {
+		putbuf(buffer, length);
+		return length;
+	}
+
+	lock_acquire(&filesys_lock);
+	struct file *open_file = thread_current()->fd_table[fd];
+	if (open_file) {
+		off_t written_bytes = file_write(open_file, buffer, length);
+		lock_release(&filesys_lock);
+		return written_bytes;
+	}
+	lock_release(&filesys_lock);
+	return -1;
 }
 
 void

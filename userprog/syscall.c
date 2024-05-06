@@ -153,10 +153,14 @@ open (const char *file) {
 	if (open_file = filesys_open(file)) {
 		// 디스크립터 테이블에 open_file 저장
 		fd++; // 새로 open한 fd는 이전의 fd 번호에 +1
-		thread_current()->fd_table[fd++] = open_file;
+		thread_current()->fd_table[fd] = open_file;
 		return fd;
 	}
 	return -1;
+}
+
+int read (int fd, void *buffer, unsigned length) {
+	
 }
 
 int
@@ -172,5 +176,5 @@ close (int fd) {
 
 	curr_file = thread_current()->fd_table[fd];
 	thread_current()->fd_table[fd] = NULL;
-	free(curr_file);
+	file_close(curr_file);
 }

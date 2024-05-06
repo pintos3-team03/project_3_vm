@@ -50,8 +50,12 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char *save_ptr;
+	char *token;
+	token = strtok_r(file_name, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (token, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -333,7 +337,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	struct file *file = NULL;
 	off_t file_ofs;
 	bool success = false;
-	int i, cnt = 0;
+	int i, cnt = 1;
 	size_t size_argv;
 	char *parsing_ptr;
 	char *next_ptr;
@@ -434,45 +438,43 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (size_argv % 8 != 0)
 		size_argv = ((size_argv / 8) + 1) * 8;
 	extend_rsp = if_->rsp - size_argv;
-	
-	// 명령어 파싱
-	char *token = strrchr(next_ptr, ' ');
 
 	// 경계 설정
 	extend_rsp -= 8;
 	*extend_rsp = 0;
 
-	// 파싱 데이터 푸시, 해당 데이터 주소도 스택에 푸시
-	while (token) {
-		token += 1;
-		
+	// 명령어 파싱
+	char *token = strrchr(next_ptr, ' ');
+
+	if (strlen(next_ptr) > 0) {
+		// 파싱 데이터 푸시, 해당 데이터 주소도 스택에 푸시
+		while (token) {
+			token += 1;
+			
+			temp_rsp -= strlen(token) + 1;
+			memcpy(temp_rsp, token, strlen(token) + 1);
+			extend_rsp -= 8;
+			memcpy(extend_rsp, &temp_rsp, 8);
+
+			while (*(token - 1) == ' ') {
+				token -= 1;
+				*token = '\0';
+			}
+			token = strrchr(next_ptr, ' ');
+			cnt += 1;
+		}
+		token = next_ptr;
+		cnt += 1;
 		temp_rsp -= strlen(token) + 1;
 		memcpy(temp_rsp, token, strlen(token) + 1);
 		extend_rsp -= 8;
 		memcpy(extend_rsp, &temp_rsp, 8);
-
-		while (*(token - 1) == ' ') {
-			token -= 1;
-			*token = '\0';
-		}
-		token = strrchr(next_ptr, ' ');
-		cnt += 1;
 	}
-	token = next_ptr;
-	cnt += 1;
-	temp_rsp -= strlen(token) + 1;
-	memcpy(temp_rsp, token, strlen(token) + 1);
-	extend_rsp -= 8;
-	memcpy(extend_rsp, &temp_rsp, 8);
 
 	// 먼저 찾아둔 file name(경로)도 스택에 푸시
 	temp_rsp -= strlen(parsing_ptr) + 1;
 	memcpy(temp_rsp, parsing_ptr, strlen(parsing_ptr) + 1);
-	// 데이터 패딩 0으로 초기화
-	// if (temp_rsp != (if_->rsp - size_argv)) {
-	// 	temp_rsp -= sizeof(uint8_t);
-	// 	memset(temp_rsp, 0, sizeof(uint8_t));
-	// }
+
 	extend_rsp -= 8;
 	memcpy(extend_rsp, &temp_rsp, 8);
 
@@ -483,7 +485,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	*extend_rsp = 0;
 	if_->rsp = extend_rsp;
 
-	hex_dump(if_->rsp, if_->rsp, size_argv + ((cnt + 3) * 8), true);
+	// hex_dump(if_->rsp, if_->rsp, size_argv + ((cnt + 2) * 8), true);
 	success = true;
 
 done:

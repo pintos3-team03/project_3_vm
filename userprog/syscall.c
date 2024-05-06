@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/init.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -39,8 +40,102 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	printf ("system call!\n");
-	thread_exit ();
+syscall_handler (struct intr_frame *f) {
+	// 유저 프로그램이 전달한 포인터가 유효한 주소 범위인지 확인
+	struct thread *curr = thread_current();
+	if (is_kernel_vaddr(f->rsp) || pml4_get_page(curr->pml4, f->rsp) == NULL) 
+		thread_exit();
+	else if (is_user_vaddr(f->rsp))
+		printf ("system call!\n");
+	f->rsp -= 8; // pop
+
+	printf("rax: %lld\n", f->R.rax);
+	// TODO: 인자 값 넣어주기
+	switch (f->R.rax) {
+		case SYS_HALT:
+			halt();
+			break;
+		case SYS_EXIT:
+			exit(f->R.rdi);
+			break;
+		case SYS_FORK:
+			// f->R.rax = fork();
+			break;
+		case SYS_EXEC:
+			// f->R.rax = exec();
+			break;
+		case SYS_WAIT:
+			// f->R.rax = wait();
+			break;
+		case SYS_CREATE:
+			f->R.rax = create(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_REMOVE:
+			f->R.rax = remove(f->R.rdi);
+			break;
+		case SYS_OPEN:
+			f->R.rax = open(f->R.rdi);
+			break;
+		case SYS_FILESIZE:
+			// f->R.rax = filesize();
+			break;
+		case SYS_READ:
+			// f->R.rax = read();
+			break;
+		case SYS_WRITE:
+			// f->R.rax = write();
+			break;
+		case SYS_SEEK:
+			// f->R.rax = seek();
+			break;
+		case SYS_TELL:
+			// f->R.rax = tell();
+			break;
+		case SYS_CLOSE:
+			// f->R.rax = close();
+			break;
+		default:
+			thread_exit ();
+	}
+}
+
+void
+halt (void) {
+	power_off();
+}
+
+void
+exit (int status) {
+	printf("syscall exit!!!\n%d\n", status);
+	thread_exit();
+}
+
+bool
+create (const char *file, unsigned initial_size) {
+	// 이름을 file로 하고, 크기는 initial_size인 파일 생성
+	// 성공적으로 생성하면 true
+	if (filesys_create(file, initial_size)) {
+		printf("create!!!!!!!\n");
+		return true;
+	}
+	return false;
+}
+
+bool
+remove (const char *file) {
+	// 이름이 file인 파일 삭제 (무조건 삭제)
+	if (filesys_remove(file)) {
+		return true;
+	}
+	return false;
+}
+
+int
+open (const char *file) {
+
+}
+
+int
+write (int fd, const void *buffer, unsigned length) {
+
 }

@@ -226,6 +226,12 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
+	for (int i = 2; i < 128; i++) {
+		if (curr->fd_table[i])
+			file_close(curr->fd_table[i]);
+	}
+
 	process_cleanup ();
 }
 

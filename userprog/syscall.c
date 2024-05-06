@@ -95,10 +95,10 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
-			// f->R.rax = seek();
+			seek(f->R.rdi, f->R.rsi);
 			break;
 		case SYS_TELL:
-			// f->R.rax = tell();
+			f->R.rax = tell(f->R.rdi);
 			break;
 		case SYS_CLOSE:
 			close(f->R.rdi);
@@ -218,6 +218,24 @@ write (int fd, const void *buffer, unsigned length) {
 	}
 	lock_release(&filesys_lock);
 	return -1;
+}
+
+void seek (int fd, unsigned position) {
+	if (!fd || fd > 128)
+		exit(-1);
+	
+	struct file *open_file = thread_current()->fd_table[fd];
+	if (open_file)
+		file_seek(open_file, position);
+}
+
+unsigned tell (int fd) {
+	if (!fd || fd > 128)
+		exit(-1);
+	
+	struct file *open_file = thread_current()->fd_table[fd];
+	if (open_file)
+		file_tell(open_file);
 }
 
 void

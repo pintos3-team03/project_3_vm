@@ -38,18 +38,22 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
+static bool
+check_address(void *addr) {
+	if (is_kernel_vaddr(addr) || pml4_get_page(thread_current()->pml4, addr) == NULL) 
+		return false;
+	return true;
+}
+
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
 	// 유저 프로그램이 전달한 포인터가 유효한 주소 범위인지 확인
 	struct thread *curr = thread_current();
-	if (is_kernel_vaddr(f->rsp) || pml4_get_page(curr->pml4, f->rsp) == NULL) 
+	if (!check_address(f->rsp)) 
 		thread_exit();
-	else if (is_user_vaddr(f->rsp))
-		printf ("system call!\n");
-	f->rsp -= 8; // pop
 
-	printf("rax: %lld\n", f->R.rax);
+	// printf("rax: %lld\n", f->R.rax);
 	// TODO: 인자 값 넣어주기
 	switch (f->R.rax) {
 		case SYS_HALT:
@@ -57,6 +61,7 @@ syscall_handler (struct intr_frame *f) {
 			break;
 		case SYS_EXIT:
 			exit(f->R.rdi);
+			thread_exit();
 			break;
 		case SYS_FORK:
 			// f->R.rax = fork();
@@ -84,6 +89,7 @@ syscall_handler (struct intr_frame *f) {
 			break;
 		case SYS_WRITE:
 			// f->R.rax = write();
+			printf("%s", f->R.rsi);
 			break;
 		case SYS_SEEK:
 			// f->R.rax = seek();
@@ -106,7 +112,7 @@ halt (void) {
 
 void
 exit (int status) {
-	printf("syscall exit!!!\n%d\n", status);
+	printf("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
 }
 
@@ -114,28 +120,49 @@ bool
 create (const char *file, unsigned initial_size) {
 	// 이름을 file로 하고, 크기는 initial_size인 파일 생성
 	// 성공적으로 생성하면 true
-	if (filesys_create(file, initial_size)) {
-		printf("create!!!!!!!\n");
+	if (!file || !check_address(file))
+		exit(-1);
+
+	if (filesys_create(file, initial_size)) 
 		return true;
-	}
 	return false;
 }
 
 bool
 remove (const char *file) {
 	// 이름이 file인 파일 삭제 (무조건 삭제)
+	if (!file || !check_address(file))
+		exit(-1);
+
 	if (filesys_remove(file)) {
 		return true;
 	}
 	return false;
 }
 
+static int fd = 2;
 int
 open (const char *file) {
+	// 이름이 file인 파일을 정상적으로 잘 열었으면 파일 식별자(fd) 반환
+	struct file *open_file;
+	if (!file || !check_address(file))
+		exit(-1);
 
+	if (open_file = filesys_open(file)) {
+		// 디스크립터 테이블에 open_file 저장
+		fd++; // 새로 open한 fd는 이전의 fd 번호에 +1
+		thread_current()->fd_table[fd++] = open_file;
+		return fd;
+	}
+	return -1;
 }
 
 int
 write (int fd, const void *buffer, unsigned length) {
+
+}
+
+void
+close (int fd) {
 
 }

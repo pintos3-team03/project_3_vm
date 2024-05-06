@@ -8,6 +8,7 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "threads/init.h"
+#include "filesys/filesys.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -98,7 +99,7 @@ syscall_handler (struct intr_frame *f) {
 			// f->R.rax = tell();
 			break;
 		case SYS_CLOSE:
-			// f->R.rax = close();
+			close(f->R.rdi);
 			break;
 		default:
 			thread_exit ();
@@ -143,10 +144,11 @@ remove (const char *file) {
 static int fd = 2;
 int
 open (const char *file) {
-	// 이름이 file인 파일을 정상적으로 잘 열었으면 파일 식별자(fd) 반환
-	struct file *open_file;
 	if (!file || !check_address(file))
 		exit(-1);
+
+	// 이름이 file인 파일을 정상적으로 잘 열었으면 파일 식별자(fd) 반환
+	struct file *open_file;
 
 	if (open_file = filesys_open(file)) {
 		// 디스크립터 테이블에 open_file 저장
@@ -164,5 +166,11 @@ write (int fd, const void *buffer, unsigned length) {
 
 void
 close (int fd) {
+	struct file *curr_file;
+	if (!fd || fd > 128)
+		exit(-1);
 
+	curr_file = thread_current()->fd_table[fd];
+	thread_current()->fd_table[fd] = NULL;
+	free(curr_file);
 }

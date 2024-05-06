@@ -469,10 +469,10 @@ load (const char *file_name, struct intr_frame *if_) {
 	temp_rsp -= strlen(parsing_ptr) + 1;
 	memcpy(temp_rsp, parsing_ptr, strlen(parsing_ptr) + 1);
 	// 데이터 패딩 0으로 초기화
-	if (temp_rsp != (if_->rsp - size_argv)) {
-		temp_rsp -= sizeof(uint8_t);
-		memset(temp_rsp, 0, sizeof(uint8_t));
-	}
+	// if (temp_rsp != (if_->rsp - size_argv)) {
+	// 	temp_rsp -= sizeof(uint8_t);
+	// 	memset(temp_rsp, 0, sizeof(uint8_t));
+	// }
 	extend_rsp -= 8;
 	memcpy(extend_rsp, &temp_rsp, 8);
 

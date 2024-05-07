@@ -10,6 +10,7 @@
 #include "threads/init.h"
 #include "filesys/filesys.h"
 #include "threads/synch.h"
+#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -54,6 +55,8 @@ void
 syscall_handler (struct intr_frame *f) {
 	// 유저 프로그램이 전달한 포인터가 유효한 주소 범위인지 확인
 	struct thread *curr = thread_current();
+	curr->parent_if = *f;
+
 	if (!check_address(f->rsp)) 
 		thread_exit();
 
@@ -68,13 +71,13 @@ syscall_handler (struct intr_frame *f) {
 			thread_exit();
 			break;
 		case SYS_FORK:
-			// f->R.rax = fork();
+			f->R.rax = fork(f->R.rdi);
 			break;
 		case SYS_EXEC:
-			// f->R.rax = exec();
+			// f->R.rax = exec(f->R.rdi);
 			break;
 		case SYS_WAIT:
-			// f->R.rax = wait();
+			// f->R.rax = wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
 			f->R.rax = create(f->R.rdi, f->R.rsi);
@@ -118,6 +121,13 @@ exit (int status) {
 	printf("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
 }
+
+pid_t fork (const char *thread_name) {
+	return process_fork(thread_name, &thread_current()->parent_if);
+}
+
+int exec (const char *file);
+int wait (pid_t);
 
 bool
 create (const char *file, unsigned initial_size) {

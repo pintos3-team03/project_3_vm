@@ -211,6 +211,14 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	/* For process hierarchy */
+	// t->is_process_create_success = false;
+	// t->is_exit = false;
+	// sema_init(&t->sema_exit, 0);
+	sema_init(&t->sema_load, 0);
+	// 자식 리스트에 추가 
+	list_push_back(&thread_current()->child_list, &t->child_elem);
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -556,6 +564,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
+	list_init(&t->child_list);
 	t->magic = THREAD_MAGIC;
 }
 

@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -113,11 +114,10 @@ struct thread {
 	struct list_elem child_elem;
 	struct list child_list;
 
-	bool is_process_create_success;
-	bool is_exit;
-	// struct semaphore *sema_exit;
-	struct semaphore *sema_load;
-	// bool status;
+	// int is_exit;
+	struct semaphore sema_load;
+	struct semaphore sema_exit;
+	int exit_status;
 	
 #endif
 #ifdef VM

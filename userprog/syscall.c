@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -43,9 +44,9 @@ syscall_init (void) {
 	lock_init(&filesys_lock);
 }
 
-static bool
+bool
 check_address(void *addr) {
-	if (is_kernel_vaddr(addr) || pml4_get_page(thread_current()->pml4, addr) == NULL) 
+	if (addr == NULL || is_kernel_vaddr(addr) || pml4_get_page(thread_current()->pml4, addr) == NULL) 
 		return false;
 	return true;
 }
@@ -55,12 +56,11 @@ void
 syscall_handler (struct intr_frame *f) {
 	// 유저 프로그램이 전달한 포인터가 유효한 주소 범위인지 확인
 	struct thread *curr = thread_current();
-	curr->parent_if = *f;
+	// curr->parent_if = *f; // syscall_handler의 인자 intr_frame이 부모의 유저 모드 intr_frame
 
 	if (!check_address(f->rsp)) 
 		thread_exit();
 
-	// printf("rax: %lld\n", f->R.rax);
 	// TODO: 인자 값 넣어주기
 	switch (f->R.rax) {
 		case SYS_HALT:
@@ -71,13 +71,14 @@ syscall_handler (struct intr_frame *f) {
 			thread_exit();
 			break;
 		case SYS_FORK:
+			memcpy(&curr->parent_if, f, sizeof(struct intr_frame));
 			f->R.rax = fork(f->R.rdi);
 			break;
 		case SYS_EXEC:
 			// f->R.rax = exec(f->R.rdi);
 			break;
 		case SYS_WAIT:
-			// f->R.rax = wait(f->R.rdi);
+			f->R.rax = wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
 			f->R.rax = create(f->R.rdi, f->R.rsi);
@@ -119,15 +120,21 @@ halt (void) {
 void
 exit (int status) {
 	printf("%s: exit(%d)\n", thread_current()->name, status);
+	thread_current()->exit_status = status;
 	thread_exit();
 }
 
 pid_t fork (const char *thread_name) {
+	if (!check_address(thread_name))
+		exit(-1);
 	return process_fork(thread_name, &thread_current()->parent_if);
 }
 
 int exec (const char *file);
-int wait (pid_t);
+
+int wait (pid_t child_tid) {
+	return process_wait(child_tid);
+}
 
 bool
 create (const char *file, unsigned initial_size) {

@@ -79,15 +79,15 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_) {
+process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	// 부모의 파일 디스크립터 테이블, 가상주소 
-	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
-	struct list_elem *child_elem = list_begin(&thread_current()->child_list);
+	struct thread *cur = thread_current();
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, cur);
+	struct list_elem *child_e = list_begin(&thread_current()->child_list);
 	struct thread *child_thread;
 
-	while (child_elem != list_end(&thread_current()->child_list)) {
-		child_thread = list_entry(child_elem, struct thread, child_elem);
+	while (child_e != list_end(&thread_current()->child_list)) {
+		child_thread = list_entry(child_e, struct thread, child_elem);
 		if (child_thread->tid == tid) 
 			break;
 	}
@@ -112,19 +112,19 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
 	if (is_kernel_vaddr(va))
-		return;
+		return true;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-	newpage = palloc_get_page(PAL_USER);
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
-	memcpy(newpage, parent_page, sizeof(parent_page));
+	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
@@ -156,6 +156,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0; // 자식 프로세스에서의 반환 값
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -178,17 +179,19 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	for (int i = 0; i < 128; i++) {
-		current->fd_table[i] = file_duplicate(parent->fd_table[i]);
+		if (parent->fd_table[i])
+			current->fd_table[i] = file_duplicate(parent->fd_table[i]);
+		else
+			current->fd_table[i] = NULL;
 	}
 
-	process_init ();
-	if_.R.rax = 0; // 자식 프로세스에서의 반환 값
 	sema_up(&current->sema_load);
-
+	process_init ();
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
 error:
+	current->exit_status = -1;
 	thread_exit ();
 }
 
@@ -234,14 +237,33 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	// for (;;)
 	// ;
-	thread_sleep(100);
-	return -1;
+
+	// 자식이 모두 종료될 때까지 대기 + 자식이 올바르게 종료됐는지 확인
+	// child_tid 자식을 찾아와야 함.
+	struct thread *parent = thread_current();
+	struct list_elem *find_child = list_begin(&parent->child_list);
+	struct thread *child_thread;
+
+	while (find_child != list_end(&parent->child_list)) {
+		child_thread = list_entry(find_child, struct thread, child_elem);
+		if (child_thread->tid == child_tid)
+			break;
+		find_child = list_next(find_child);
+	}
+
+	if (!child_thread) // 존재하지 않는 자식 child_tid인 경우
+		return -1;
+
+	// 자식 프로세스가 종료될 때까지 부모 프로세스 대기
+	sema_down(&child_thread->sema_exit);
+	// child_tid의 종료 상태 반환 (자식 프로세스의 exit_status)
+	return child_thread->exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -259,6 +281,8 @@ process_exit (void) {
 			file_close(curr->fd_table[i]);
 	}
 
+	// 아직 종료되지 않은 child 프로세스 종료
+	// child 프로세스가 종료되면 부모의 child_list에서 종료하는 child 프로세스 삭제
 	process_cleanup ();
 }
 

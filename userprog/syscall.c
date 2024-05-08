@@ -12,6 +12,7 @@
 #include "filesys/filesys.h"
 #include "threads/synch.h"
 #include "userprog/process.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -75,7 +76,7 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = fork(f->R.rdi);
 			break;
 		case SYS_EXEC:
-			// f->R.rax = exec(f->R.rdi);
+			f->R.rax = exec(f->R.rdi);
 			break;
 		case SYS_WAIT:
 			f->R.rax = wait(f->R.rdi);
@@ -130,7 +131,14 @@ pid_t fork (const char *thread_name) {
 	return process_fork(thread_name, &thread_current()->parent_if);
 }
 
-int exec (const char *file);
+int exec (const char *file) {
+	if (!check_address(file))
+		exit(-1);
+		
+	char *file_name = palloc_get_page(PAL_ZERO);
+	memcpy(file_name, file, strlen(file) + 1);
+	return process_exec(file_name);
+}
 
 int wait (pid_t child_tid) {
 	return process_wait(child_tid);

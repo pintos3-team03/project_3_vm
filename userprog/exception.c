@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "userprog/syscall.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "intrinsic.h"
@@ -85,9 +86,12 @@ kill (struct intr_frame *f) {
 			   expected.  Kill the user process.  */
 			printf ("%s: dying due to interrupt %#04llx (%s).\n",
 					thread_name (), f->vec_no, intr_name (f->vec_no));
+#ifdef USERPROG
+			if (!check_address(f->R.rax)) 
+				exit(-1);
+#endif
 			intr_dump_frame (f);
 			thread_exit ();
-
 		case SEL_KCSEG:
 			/* Kernel's code segment, which indicates a kernel bug.
 			   Kernel code shouldn't throw exceptions.  (Page faults

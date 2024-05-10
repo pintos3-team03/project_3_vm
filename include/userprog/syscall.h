@@ -4,7 +4,7 @@
 #include "threads/thread.h"
 #include "include/lib/user/syscall.h"
 
-bool check_address(void *addr);
+bool is_valid_address(void *addr);
 
 void syscall_init (void);
 

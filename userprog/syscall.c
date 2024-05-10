@@ -205,6 +205,7 @@ int read (int fd, void *buffer, unsigned length) {
 	if (!fd || fd > 128 || !is_valid_address(buffer))
 		exit(-1);
 
+	lock_acquire(&filesys_lock);
 	if (fd == 0) {
 		int count = 0;
 		char *temp_buf = buffer;
@@ -215,10 +216,10 @@ int read (int fd, void *buffer, unsigned length) {
 				break;
 			temp_buf++;
 		}
+		lock_release(&filesys_lock);
 		return count;
 	}
 
-	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file) {
 		off_t read_bytes = file_read(open_file, buffer, length);
@@ -234,12 +235,13 @@ write (int fd, const void *buffer, unsigned length) {
 	if (!fd || fd > 128 || !is_valid_address(buffer))
 		exit(-1);
 
+	lock_acquire(&filesys_lock);
 	if (fd == 1) {
 		putbuf(buffer, length);
+		lock_release(&filesys_lock);
 		return length;
 	}
 
-	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file) {
 		off_t written_bytes = file_write(open_file, buffer, length);

@@ -116,6 +116,7 @@ struct thread {
 	struct list child_list;
 
 	struct semaphore sema_load;
+	struct semaphore sema_wait;
 	struct semaphore sema_exit;
 	int exit_status;
 	int is_exit;

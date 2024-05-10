@@ -244,11 +244,10 @@ process_wait (tid_t child_tid) {
 	if (!child_tid)
 		return -1;
 
-	// 자식이 모두 종료될 때까지 대기 + 자식이 올바르게 종료됐는지 확인
-	// child_tid 자식을 찾아와야 함.
 	struct thread *parent = thread_current();
 	struct list_elem *find_child = list_begin(&parent->child_list);
 	struct thread *child_thread = NULL;
+	int child_status;
 
 	while (find_child != list_end(&parent->child_list)) {
 		child_thread = list_entry(find_child, struct thread, child_elem);
@@ -265,9 +264,11 @@ process_wait (tid_t child_tid) {
 		return -1;
 
 	// 자식 프로세스가 종료될 때까지 부모 프로세스 대기
-	sema_down(&child_thread->sema_exit);
+	sema_down(&child_thread->sema_wait);
 	// child_tid의 종료 상태 반환 (자식 프로세스의 exit_status)
-	return child_thread->exit_status;
+	child_status = child_thread->exit_status;
+	sema_up(&child_thread->sema_exit);
+	return child_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -278,7 +279,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	
 	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
 	file_close(curr->run_file);
 

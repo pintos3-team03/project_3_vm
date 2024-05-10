@@ -182,12 +182,15 @@ open (const char *file) {
 	// 이름이 file인 파일을 정상적으로 잘 열었으면 파일 식별자(fd) 반환
 	struct file *open_file;
 
+	lock_acquire(&filesys_lock);
 	if (open_file = filesys_open(file)) {
 		// 디스크립터 테이블에 open_file 저장
 		fd++; // 새로 open한 fd는 이전의 fd 번호에 +1
 		thread_current()->fd_table[fd] = open_file;
+		lock_release(&filesys_lock);
 		return fd;
 	}
+	lock_release(&filesys_lock);
 	return -1;
 }
 

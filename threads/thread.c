@@ -215,6 +215,7 @@ thread_create (const char *name, int priority,
 	t->exit_status = 0;
 	t->is_exit = 0;
 	sema_init(&t->sema_load, 0);
+	sema_init(&t->sema_wait, 0);
 	sema_init(&t->sema_exit, 0);
 	// 자식 리스트에 추가 
 	list_push_back(&thread_current()->child_list, &t->child_elem);
@@ -300,7 +301,8 @@ thread_exit (void) {
 	ASSERT (!intr_context ());
 
 #ifdef USERPROG
-	sema_up(&thread_current()->sema_exit);
+	sema_up(&thread_current()->sema_wait);
+	sema_down(&thread_current()->sema_exit);
 	// 자식 프로세스 디스크립터 삭제
 	list_remove(&thread_current()->child_elem);
 	thread_current()->is_exit = 1;

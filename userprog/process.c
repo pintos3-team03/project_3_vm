@@ -90,6 +90,9 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 		child_thread = list_entry(child_e, struct thread, child_elem);
 		if (child_thread->tid == tid) 
 			break;
+		else
+			child_thread = NULL;
+		child_e = list_next(child_e);
 	}
 
 	if (!child_thread)

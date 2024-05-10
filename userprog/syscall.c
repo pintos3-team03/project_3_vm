@@ -46,7 +46,7 @@ syscall_init (void) {
 }
 
 bool
-check_address(void *addr) {
+is_valid_address(void *addr) {
 	if (addr == NULL || is_kernel_vaddr(addr) || pml4_get_page(thread_current()->pml4, addr) == NULL) 
 		return false;
 	return true;
@@ -59,7 +59,7 @@ syscall_handler (struct intr_frame *f) {
 	struct thread *curr = thread_current();
 	// curr->parent_if = *f; // syscall_handler의 인자 intr_frame이 부모의 유저 모드 intr_frame
 
-	if (!check_address(f->rsp)) 
+	if (!is_valid_address(f->rsp)) 
 		thread_exit();
 
 	// TODO: 인자 값 넣어주기
@@ -126,13 +126,13 @@ exit (int status) {
 }
 
 pid_t fork (const char *thread_name) {
-	if (!check_address(thread_name))
+	if (!is_valid_address(thread_name))
 		exit(-1);
 	return process_fork(thread_name, &thread_current()->parent_if);
 }
 
 int exec (const char *file) {
-	if (!check_address(file))
+	if (!is_valid_address(file))
 		exit(-1);
 		
 	char *file_name = palloc_get_page(PAL_ZERO);
@@ -153,7 +153,7 @@ bool
 create (const char *file, unsigned initial_size) {
 	// 이름을 file로 하고, 크기는 initial_size인 파일 생성
 	// 성공적으로 생성하면 true
-	if (!file || !check_address(file))
+	if (!file || !is_valid_address(file))
 		exit(-1);
 
 	if (filesys_create(file, initial_size)) 
@@ -164,7 +164,7 @@ create (const char *file, unsigned initial_size) {
 bool
 remove (const char *file) {
 	// 이름이 file인 파일 삭제 (무조건 삭제)
-	if (!file || !check_address(file))
+	if (!file || !is_valid_address(file))
 		exit(-1);
 
 	if (filesys_remove(file)) {
@@ -176,7 +176,7 @@ remove (const char *file) {
 static int fd = 2;
 int
 open (const char *file) {
-	if (!file || !check_address(file))
+	if (!file || !is_valid_address(file))
 		exit(-1);
 
 	// 이름이 file인 파일을 정상적으로 잘 열었으면 파일 식별자(fd) 반환
@@ -202,7 +202,7 @@ int filesize (int fd) {
 }
 
 int read (int fd, void *buffer, unsigned length) {
-	if (!fd || fd > 128 || !check_address(buffer))
+	if (!fd || fd > 128 || !is_valid_address(buffer))
 		exit(-1);
 
 	if (fd == 0) {
@@ -231,7 +231,7 @@ int read (int fd, void *buffer, unsigned length) {
 
 int
 write (int fd, const void *buffer, unsigned length) {
-	if (!fd || fd > 128 || !check_address(buffer))
+	if (!fd || fd > 128 || !is_valid_address(buffer))
 		exit(-1);
 
 	if (fd == 1) {

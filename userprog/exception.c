@@ -87,7 +87,7 @@ kill (struct intr_frame *f) {
 			printf ("%s: dying due to interrupt %#04llx (%s).\n",
 					thread_name (), f->vec_no, intr_name (f->vec_no));
 #ifdef USERPROG
-			if (!check_address(f->R.rax)) 
+			if (!is_valid_address(f->R.rax)) 
 				exit(-1);
 #endif
 			intr_dump_frame (f);

@@ -136,8 +136,13 @@ int exec (const char *file) {
 		exit(-1);
 		
 	char *file_name = palloc_get_page(PAL_ZERO);
+	if (file_name == NULL)
+		exit(-1);
+
 	memcpy(file_name, file, strlen(file) + 1);
-	return process_exec(file_name);
+	if (process_exec(file_name) == -1)
+		exit(-1);
+	return 0;
 }
 
 int wait (pid_t child_tid) {

@@ -114,11 +114,10 @@ struct thread {
 	struct list_elem child_elem;
 	struct list child_list;
 
-	// int is_exit;
 	struct semaphore sema_load;
 	struct semaphore sema_exit;
 	int exit_status;
-	
+	int is_exit;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

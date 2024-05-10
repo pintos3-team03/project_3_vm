@@ -238,26 +238,27 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid) {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	// for (;;)
-	// ;
+	if (!child_tid)
+		return -1;
 
 	// 자식이 모두 종료될 때까지 대기 + 자식이 올바르게 종료됐는지 확인
 	// child_tid 자식을 찾아와야 함.
 	struct thread *parent = thread_current();
 	struct list_elem *find_child = list_begin(&parent->child_list);
-	struct thread *child_thread;
+	struct thread *child_thread = NULL;
 
 	while (find_child != list_end(&parent->child_list)) {
 		child_thread = list_entry(find_child, struct thread, child_elem);
 		if (child_thread->tid == child_tid)
 			break;
+		else
+			child_thread = NULL;
 		find_child = list_next(find_child);
 	}
 
-	if (!child_thread) // 존재하지 않는 자식 child_tid인 경우
+	if (child_thread == NULL) // 존재하지 않는 자식 child_tid인 경우
+		return -1;
+	if (child_thread->is_exit)
 		return -1;
 
 	// 자식 프로세스가 종료될 때까지 부모 프로세스 대기

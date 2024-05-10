@@ -277,13 +277,8 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
 	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
-	for (int i = 0; i < 128; i++) {
-		if (curr->fd_table[i])
-			file_close(curr->fd_table[i]);
-	}
+	file_close(curr->run_file);
 
-	// 아직 종료되지 않은 child 프로세스 종료
-	// child 프로세스가 종료되면 부모의 child_list에서 종료하는 child 프로세스 삭제
 	process_cleanup ();
 }
 
@@ -400,6 +395,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *parsing_ptr;
 	char *next_ptr;
 	char *temp_rsp, *extend_rsp;
+	struct lock open_file_lock;
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -411,11 +407,17 @@ load (const char *file_name, struct intr_frame *if_) {
 	parsing_ptr = strtok_r(file_name, " ", &next_ptr);
 
 	/* Open executable file. */
+	lock_init(&open_file_lock);
+	lock_acquire(&open_file_lock);
 	file = filesys_open (parsing_ptr);
 	if (file == NULL) {
+		lock_release(&open_file_lock);
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	thread_current()->run_file = file;
+	file_deny_write(file);
+	lock_release(&open_file_lock);
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -548,7 +550,8 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	if (!success)
+		file_close (file);
 	return success;
 }
 

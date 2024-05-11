@@ -282,7 +282,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	
+	printf("%s: exit(%d)\n", thread_current()->name, thread_current()->exit_status);
 	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
 	file_close(curr->run_file);
 

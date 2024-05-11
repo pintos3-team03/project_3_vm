@@ -181,13 +181,13 @@ open (const char *file) {
 	struct thread *curr = thread_current();
 	struct file *open_file;
 
-	if (curr->fd_max >= 128)
+	if (curr->fd_max >= FD_MAX)
 		return -1;
 
 	lock_acquire(&filesys_lock);
 	if (open_file = filesys_open(file)) {
 		// 디스크립터 테이블에 open_file 저장
-		for (int idx = curr->fd_max; idx < 128; idx++) {
+		for (int idx = curr->fd_max; idx < FD_MAX; idx++) {
 			if (curr->fd_table[idx] == NULL) {
 				curr->fd_table[idx] = open_file;
 				curr->fd_max = idx;
@@ -196,14 +196,14 @@ open (const char *file) {
 			}
 		}
 		file_close(open_file);
-		curr->fd_max = 128;
+		curr->fd_max = FD_MAX;
 	}
 	lock_release(&filesys_lock);
 	return -1;
 }
 
 int filesize (int fd) {
-	if (!fd || fd > 128)
+	if (!fd || fd > FD_MAX)
 		exit(-1);
 	
 	struct file *open_file = thread_current()->fd_table[fd];
@@ -213,7 +213,7 @@ int filesize (int fd) {
 }
 
 int read (int fd, void *buffer, unsigned length) {
-	if (!fd || fd > 128 || !is_valid_address(buffer))
+	if (!fd || fd > FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 
 	lock_acquire(&filesys_lock);
@@ -243,7 +243,7 @@ int read (int fd, void *buffer, unsigned length) {
 
 int
 write (int fd, const void *buffer, unsigned length) {
-	if (!fd || fd > 128 || !is_valid_address(buffer))
+	if (!fd || fd > FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 
 	lock_acquire(&filesys_lock);
@@ -264,7 +264,7 @@ write (int fd, const void *buffer, unsigned length) {
 }
 
 void seek (int fd, unsigned position) {
-	if (!fd || fd > 128)
+	if (!fd || fd > FD_MAX)
 		exit(-1);
 	
 	struct file *open_file = thread_current()->fd_table[fd];
@@ -273,7 +273,7 @@ void seek (int fd, unsigned position) {
 }
 
 unsigned tell (int fd) {
-	if (!fd || fd > 128)
+	if (!fd || fd > FD_MAX)
 		exit(-1);
 	
 	struct file *open_file = thread_current()->fd_table[fd];
@@ -284,7 +284,7 @@ unsigned tell (int fd) {
 void
 close (int fd) {
 	struct file *curr_file;
-	if (!fd || fd > 128)
+	if (!fd || fd > FD_MAX)
 		exit(-1);
 
 	curr_file = thread_current()->fd_table[fd];

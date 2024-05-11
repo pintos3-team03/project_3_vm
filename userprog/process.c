@@ -184,10 +184,7 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-	// if (parent->fd_max >= 128)
-	// 	goto error;
-
-	for (int i = 0; i < 128; i++) {
+	for (int i = 0; i < FD_MAX; i++) {
 		if (parent->fd_table[i])
 			current->fd_table[i] = file_duplicate(parent->fd_table[i]);
 		else

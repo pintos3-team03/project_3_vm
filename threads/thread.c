@@ -218,7 +218,7 @@ thread_create (const char *name, int priority,
 	sema_init(&t->sema_load, 0);
 	sema_init(&t->sema_wait, 0);
 	sema_init(&t->sema_exit, 0);
-	// 자식 리스트에 추가 
+	// 부모의 자식 리스트에 방금 생성한 자식 추가 
 	list_push_back(&thread_current()->child_list, &t->child_elem);
 
 	/* Add to run queue. */
@@ -259,7 +259,6 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	// list_push_back (&ready_list, &t->elem);
 	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -329,7 +328,6 @@ thread_yield (void) {
 	old_level = intr_disable ();
 	if (curr != idle_thread)
 		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
-		// list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -357,7 +355,7 @@ void thread_awake (int64_t ticks) {
 	while(cur_elem != list_end(&sleep_list)) {
 		struct thread *find_thread = list_entry (cur_elem, struct thread, elem);
 		if (find_thread->wake_up_tick <= ticks) {
-			cur_elem = list_remove(cur_elem);     // sleep list에서 빼기
+			cur_elem = list_remove(cur_elem); // sleep list에서 빼기
 			thread_unblock(find_thread);
 		}
 		else 
@@ -431,7 +429,6 @@ bool cmp_donations (const struct list_elem  *cmp_elem, const struct list_elem  *
 }
 
 void donate_priority(void) {
-	// struct thread *curr = running_thread();
 	struct thread *curr = thread_current();	
 	struct thread *next = curr->wait_on_lock->holder;
 	int cnt = 0;
@@ -454,7 +451,6 @@ void donate_priority(void) {
 
 /* 락 놔줄 때 락 기다리고 있던 donations 지우기 */
 void remove_with_lock(struct lock *lock) {
-	// struct thread *curr = running_thread();
 	struct thread *curr = thread_current();	
 	struct list_elem *donation = list_begin(&curr->donations);
 
@@ -466,7 +462,6 @@ void remove_with_lock(struct lock *lock) {
 }
 
 void refresh_priority(void) {
-	// struct thread *curr = running_thread();
 	struct thread *curr = thread_current();	
 	curr->priority = curr->init_priority;
 

@@ -55,14 +55,11 @@ is_valid_address(void *addr) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
-	// 유저 프로그램이 전달한 포인터가 유효한 주소 범위인지 확인
 	struct thread *curr = thread_current();
-	// curr->parent_if = *f; // syscall_handler의 인자 intr_frame이 부모의 유저 모드 intr_frame
 
 	if (!is_valid_address(f->rsp)) 
 		thread_exit();
 
-	// TODO: 인자 값 넣어주기
 	switch (f->R.rax) {
 		case SYS_HALT:
 			halt();
@@ -150,8 +147,6 @@ int wait (pid_t child_tid) {
 
 bool
 create (const char *file, unsigned initial_size) {
-	// 이름을 file로 하고, 크기는 initial_size인 파일 생성
-	// 성공적으로 생성하면 true
 	if (!file || !is_valid_address(file))
 		exit(-1);
 
@@ -162,7 +157,6 @@ create (const char *file, unsigned initial_size) {
 
 bool
 remove (const char *file) {
-	// 이름이 file인 파일 삭제 (무조건 삭제)
 	if (!file || !is_valid_address(file))
 		exit(-1);
 
@@ -177,7 +171,6 @@ open (const char *file) {
 	if (!file || !is_valid_address(file))
 		exit(-1);
 
-	// 이름이 file인 파일을 정상적으로 잘 열었으면 파일 식별자(fd) 반환
 	struct thread *curr = thread_current();
 	struct file *open_file;
 
@@ -186,8 +179,7 @@ open (const char *file) {
 
 	lock_acquire(&filesys_lock);
 	if (open_file = filesys_open(file)) {
-		// 디스크립터 테이블에 open_file 저장
-		for (int idx = curr->fd_max; idx < FD_MAX; idx++) {
+		for (int idx = curr->fd_max; idx < FD_MAX; idx++) { // 디스크립터 테이블에 open_file 저장
 			if (curr->fd_table[idx] == NULL) {
 				curr->fd_table[idx] = open_file;
 				curr->fd_max = idx;

@@ -200,7 +200,6 @@ __do_fork (void *aux) {
 error:
 	current->exit_status = TID_ERROR;
 	sema_up(&current->sema_load);
-	// thread_exit ();
 	exit(-1);
 }
 
@@ -560,7 +559,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	*extend_rsp = 0;
 	if_->rsp = extend_rsp;
 
-	// hex_dump(if_->rsp, if_->rsp, size_argv + ((cnt + 2) * 8), true);
 	success = true;
 
 done:

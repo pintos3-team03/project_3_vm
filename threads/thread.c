@@ -199,6 +199,7 @@ thread_create (const char *name, int priority,
 	/* Initialize fd_table */
 	for (int i = 2; i < 128; i++)
 		t->fd_table[i] = NULL;
+	t->fd_max = 2;
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */

@@ -84,7 +84,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	struct thread *cur = thread_current();
 	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, cur);
 	struct list_elem *child_e = list_begin(&thread_current()->child_list);
-	struct thread *child_thread;
+	struct thread *child_thread = NULL;
 
 	while (child_e != list_end(&thread_current()->child_list)) {
 		child_thread = list_entry(child_e, struct thread, child_elem);
@@ -181,6 +181,9 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	if (current->fd_max == 128)
+		goto error;
+
 	for (int i = 0; i < 128; i++) {
 		if (parent->fd_table[i])
 			current->fd_table[i] = file_duplicate(parent->fd_table[i]);

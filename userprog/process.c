@@ -187,7 +187,7 @@ __do_fork (void *aux) {
 	// if (parent->fd_max >= 128)
 	// 	goto error;
 
-	for (int i = 0; i < parent->fd_max; i++) {
+	for (int i = 0; i < 128; i++) {
 		if (parent->fd_table[i])
 			current->fd_table[i] = file_duplicate(parent->fd_table[i]);
 		else

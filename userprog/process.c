@@ -184,15 +184,16 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-	if (parent->fd_max == 128)
-		goto error;
+	// if (parent->fd_max >= 128)
+	// 	goto error;
 
-	for (int i = 0; i < 128; i++) {
+	for (int i = 0; i < parent->fd_max; i++) {
 		if (parent->fd_table[i])
 			current->fd_table[i] = file_duplicate(parent->fd_table[i]);
 		else
 			current->fd_table[i] = NULL;
 	}
+	current->fd_max = parent->fd_max;
 
 	sema_up(&current->sema_load);
 	process_init ();
@@ -201,8 +202,8 @@ __do_fork (void *aux) {
 		do_iret (&if_);
 error:
 	current->exit_status = TID_ERROR;
-	// thread_exit ();
 	sema_up(&current->sema_load);
+	// thread_exit ();
 	exit(-1);
 }
 
@@ -290,6 +291,11 @@ process_exit (void) {
 	printf("%s: exit(%d)\n", thread_current()->name, thread_current()->exit_status);
 	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
 	file_close(curr->run_file);
+
+	for (int i = 2; i < curr->fd_max; i++) {
+		if (curr->fd_table[i] != NULL)
+			file_close(curr->fd_table[i]);
+	}
 
 	process_cleanup ();
 }

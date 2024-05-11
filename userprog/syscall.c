@@ -181,16 +181,21 @@ open (const char *file) {
 	struct thread *curr = thread_current();
 	struct file *open_file;
 
+	if (curr->fd_max >= 128)
+		return -1;
+
 	lock_acquire(&filesys_lock);
 	if (open_file = filesys_open(file)) {
 		// 디스크립터 테이블에 open_file 저장
 		for (int idx = curr->fd_max; idx < 128; idx++) {
 			if (curr->fd_table[idx] == NULL) {
-				curr->fd_table[curr->fd_max] = open_file;
+				curr->fd_table[idx] = open_file;
+				curr->fd_max = idx;
 				lock_release(&filesys_lock);
 				return curr->fd_max;
 			}
 		}
+		file_close(open_file);
 		curr->fd_max = 128;
 	}
 	lock_release(&filesys_lock);

@@ -99,6 +99,9 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 		return TID_ERROR;
 
 	sema_down(&child_thread->sema_load);
+	if (child_thread->exit_status == TID_ERROR)
+		return TID_ERROR;
+
 	return tid; 
 }
 
@@ -181,7 +184,7 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-	if (current->fd_max == 128)
+	if (parent->fd_max == 128)
 		goto error;
 
 	for (int i = 0; i < 128; i++) {
@@ -197,8 +200,10 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
-	current->exit_status = -1;
-	thread_exit ();
+	current->exit_status = TID_ERROR;
+	// thread_exit ();
+	sema_up(&current->sema_load);
+	exit(-1);
 }
 
 /* Switch the current execution context to the f_name.

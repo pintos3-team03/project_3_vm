@@ -288,7 +288,7 @@ process_exit (void) {
 	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
 	file_close(curr->run_file);
 
-	for (int i = 2; i < curr->fd_max; i++) {
+	for (int i = 0; i < curr->fd_max; i++) {
 		if (curr->fd_table[i] != NULL)
 			file_close(curr->fd_table[i]);
 	}

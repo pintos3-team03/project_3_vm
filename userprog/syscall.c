@@ -222,6 +222,8 @@ int read (int fd, void *buffer, unsigned length) {
 		lock_release(&filesys_lock);
 		return count;
 	}
+	if (fd == 1)
+		exit(-1);
 
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file) {

@@ -47,7 +47,7 @@ syscall_init (void) {
 
 bool
 is_valid_address(void *addr) {
-	if (addr == NULL || is_kernel_vaddr(addr) || pml4_get_page(thread_current()->pml4, addr) == NULL) 
+	if (addr == NULL || is_kernel_vaddr(addr) || (spt_find_page(&thread_current()->spt, addr) == NULL)) 
 		return false;
 	return true;
 }

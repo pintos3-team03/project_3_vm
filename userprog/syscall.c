@@ -205,7 +205,7 @@ int filesize (int fd) {
 }
 
 int read (int fd, void *buffer, unsigned length) {
-	if (!fd || fd > FD_MAX || !is_valid_address(buffer))
+	if (fd < 0 || fd >= FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 
 	lock_acquire(&filesys_lock);
@@ -235,7 +235,7 @@ int read (int fd, void *buffer, unsigned length) {
 
 int
 write (int fd, const void *buffer, unsigned length) {
-	if (!fd || fd > FD_MAX || !is_valid_address(buffer))
+	if (fd < 0 || fd >= FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 
 	lock_acquire(&filesys_lock);

@@ -95,9 +95,9 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page page;
-	page.va = pg_round_down(va);
-	struct hash_elem *test = hash_find(&spt->spt_table, &page.hash_elem);
+	struct page *page = malloc(sizeof(struct page));
+	page->va = pg_round_down(va);
+	struct hash_elem *test = hash_find(&spt->spt_table, &page->hash_elem);
 	
 	if (test == NULL) {
 		return NULL;

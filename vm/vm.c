@@ -5,11 +5,13 @@
 #include "vm/inspect.h"
 #include "threads/mmu.h"
 #include "include/vm/uninit.h"
+#include <string.h>
 
 struct list frame_table;
 
 static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
 static bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+static void page_destory(struct hash_elem *del, void *hash);
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -95,9 +97,9 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page page;
-	page.va = pg_round_down(va);
-	struct hash_elem *test = hash_find(&spt->spt_table, &page.hash_elem);
+	struct page *page = malloc(sizeof(struct page));
+	page->va = pg_round_down(va);
+	struct hash_elem *test = hash_find(&spt->spt_table, &page->hash_elem);
 	
 	if (test == NULL) {
 		return NULL;
@@ -265,11 +267,46 @@ page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNU
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+	struct hash *src_spt = &src->spt_table;
+	struct hash_iterator hash_i;
+	hash_first(&hash_i, src_spt);
+
+	while (hash_next(&hash_i)) {
+		struct page *parent_page = hash_entry(hash_cur(&hash_i), struct page, hash_elem);
+		struct page *upage = parent_page->va;
+		enum vm_type type = parent_page->operations->type;
+		bool writable = parent_page->writable;
+
+		if (type == VM_UNINIT) {
+			void *aux = parent_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, parent_page->uninit.init, aux);
+			continue;
+		}
+
+		/* src copy */
+		if (!vm_alloc_page(type, upage, writable)) // upage를 uninit page으로 초기화 + 자식 spt에 insert
+			return false;
+
+		if (!vm_claim_page(upage)) // 자식 페이지의 프레임 할당
+			return false;
+
+		struct page *child_page = spt_find_page(dst, upage);
+		memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+	}
+	return true;
 }
 
 /* Free the resource hold by the supplemental page table */
+static void
+page_destory(struct hash_elem *del, void *hash) {
+	struct page *del_page = hash_entry(del, struct page, hash_elem);
+	destroy(del_page);
+	free(del_page);
+}
+
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	hash_clear(&spt->spt_table, page_destory);
 }

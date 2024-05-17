@@ -216,7 +216,7 @@ vm_claim_page (void *va UNUSED) {
 	struct thread *curr = thread_current();
 	
 	/* TODO: Fill this function */
-	page = spt_find_page(&curr->spt, pg_round_down(va));
+	page = spt_find_page(&curr->spt, va);
 	if (page == NULL)
 		return false;
 
@@ -279,7 +279,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
 		if (type == VM_UNINIT) {
 			void *aux = parent_page->uninit.aux;
-			vm_alloc_page_with_initializer(VM_ANON, upage, writable, parent_page->uninit.init, aux);
+			if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, parent_page->uninit.init, aux))
+				return false;
 			continue;
 		}
 

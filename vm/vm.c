@@ -225,6 +225,8 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		if (addr >= (USER_STACK - (1 << 20)) && addr <= USER_STACK) // check stack limit
 			vm_stack_growth(addr);
 	}
+	if (addr >= (USER_STACK - (1 << 20)) && addr == rsp - 8) // push 했을 때
+		vm_stack_growth(addr);
 	
 	page = spt_find_page(spt, addr);
 	if (page == NULL)

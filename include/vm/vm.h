@@ -48,7 +48,7 @@ struct page {
 
 	/* Your implementation */
 	struct hash_elem hash_elem;
-
+	bool writable;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -59,7 +59,6 @@ struct page {
 		struct page_cache page_cache;
 #endif
 	};
-	bool writable;
 };
 
 /* The representation of "frame" */

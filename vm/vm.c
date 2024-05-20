@@ -167,6 +167,9 @@ vm_get_frame (void) {
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 
+	/* frame table에 frame 추가 */
+	list_push_front(&frame_table, &frame->frame_elem);
+
 	return frame;
 }
 
@@ -197,7 +200,8 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	page = spt_find_page(spt, addr);
 	if (page == NULL)
 		return false;
-
+	if (write == 1 && page->writable == 0)
+        return false;
 	return vm_do_claim_page (page);
 }
 
@@ -235,9 +239,6 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	pml4_set_page(curr->pml4, page->va, frame->kva, page->writable); // (va - pa) mapping
-
-	/* frame table에 frame 추가 */
-	list_push_front(&frame_table, &frame->frame_elem);
 
 	return swap_in (page, frame->kva);
 }
@@ -279,7 +280,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
 		if (type == VM_UNINIT) {
 			void *aux = parent_page->uninit.aux;
-			if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, parent_page->uninit.init, aux))
+			if (!vm_alloc_page_with_initializer(parent_page->uninit.type, upage, writable, parent_page->uninit.init, aux))
 				return false;
 			continue;
 		}

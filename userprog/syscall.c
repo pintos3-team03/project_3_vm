@@ -208,6 +208,10 @@ int read (int fd, void *buffer, unsigned length) {
 	if (fd < 0 || fd >= FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 
+	struct page *page = spt_find_page(&thread_current()->spt, buffer);
+	if (page->writable == 0)
+		exit(-1);
+
 	lock_acquire(&filesys_lock);
 	if (fd == 0) {
 		int count = 0;
@@ -222,9 +226,10 @@ int read (int fd, void *buffer, unsigned length) {
 		lock_release(&filesys_lock);
 		return count;
 	}
-	if (fd == 1)
+	if (fd == 1) {
+		lock_release(&filesys_lock);
 		exit(-1);
-
+	}
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file) {
 		off_t read_bytes = file_read(open_file, buffer, length);

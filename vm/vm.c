@@ -218,8 +218,11 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		rsp = f->rsp;
 	}
 
-	if (addr <= rsp) {
-		if (addr >= (USER_STACK - 2 << 10)) // check stack limit
+	if ((uintptr_t)rsp < USER_STACK - (1 << 20) || (uintptr_t)rsp > USER_STACK)
+		return false;
+
+	if (addr >= rsp) {
+		if (addr >= (USER_STACK - (1 << 20)) && addr <= USER_STACK) // check stack limit
 			vm_stack_growth(addr);
 	}
 	

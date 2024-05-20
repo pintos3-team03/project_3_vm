@@ -56,6 +56,7 @@ is_valid_address(void *addr) {
 void
 syscall_handler (struct intr_frame *f) {
 	struct thread *curr = thread_current();
+	curr->user_rsp = f->rsp;
 
 	if (!is_valid_address(f->rsp)) 
 		thread_exit();

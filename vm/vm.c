@@ -176,6 +176,17 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	uintptr_t rsp_page = pg_round_down(thread_current()->user_rsp);
+    uintptr_t fault_page = pg_round_down(addr);
+    
+    // 페이지 수 계산 (필요한 페이지 수를 정확히 계산하기 위해 + 1을 더함)
+    int num_pages = (rsp_page - fault_page) / PGSIZE + 1;
+
+    for (int i = 0; i < num_pages; i++) {
+        // 페이지 주소를 계산하여 할당
+        void *page_addr = pg_round_down(fault_page) + i * PGSIZE;
+        vm_alloc_page(VM_ANON | VM_MARKER_0, page_addr, 1);
+    }
 }
 
 /* Handle the fault on write_protected page */
@@ -189,6 +200,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
+	void *rsp;
 
 	/* TODO: Validate the fault */
 	if (addr == NULL)
@@ -197,6 +209,20 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		return false;
 	if (!not_present)
 		return false;
+
+	/* check addr (stack growth) */
+	if (!user) {
+		rsp = thread_current()->user_rsp;
+	} else {
+		thread_current()->user_rsp = f->rsp;
+		rsp = f->rsp;
+	}
+
+	if (addr <= rsp) {
+		if (addr >= (USER_STACK - 2 << 10)) // check stack limit
+			vm_stack_growth(addr);
+	}
+	
 	page = spt_find_page(spt, addr);
 	if (page == NULL)
 		return false;

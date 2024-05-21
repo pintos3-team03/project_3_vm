@@ -7,6 +7,8 @@
 #include "include/vm/uninit.h"
 #include <string.h>
 
+#define ONE_MB (1 << 20)
+
 struct list frame_table;
 
 static unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
@@ -218,20 +220,20 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		rsp = f->rsp;
 	}
 
-	if ((uintptr_t)rsp < USER_STACK - (1 << 20) || (uintptr_t)rsp > USER_STACK)
+	if ((uintptr_t)rsp < USER_STACK - ONE_MB || (uintptr_t)rsp > USER_STACK)
 		return false;
 
-	if (addr >= rsp) {
-		if (addr >= (USER_STACK - (1 << 20)) && addr <= USER_STACK) // check stack limit
+	if (addr >= (USER_STACK - ONE_MB)) {
+		if (addr >= rsp && addr <= USER_STACK) // check stack limit
+			vm_stack_growth(addr);
+		if (addr >= rsp - 8) // push 했을 때
 			vm_stack_growth(addr);
 	}
-	if (addr >= (USER_STACK - (1 << 20)) && addr == rsp - 8) // push 했을 때
-		vm_stack_growth(addr);
 	
 	page = spt_find_page(spt, addr);
 	if (page == NULL)
 		return false;
-	if (write == 1 && page->writable == 0)
+	if (write && !page->writable)
         return false;
 	return vm_do_claim_page (page);
 }

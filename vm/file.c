@@ -28,6 +28,13 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
+	struct load_segment_aux *load_segment_aux = (struct load_segment_aux *)page->uninit.aux;
+	
+	// page->file에 파일 정보 저장
+	file_page = load_segment_aux->file;
+	file_page = load_segment_aux->ofs;
+	file_page = load_segment_aux->read_bytes;
+	file_page = load_segment_aux->zero_bytes;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -46,6 +53,12 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+
+	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
+		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->ofs);
+		pml4_set_dirty(thread_current()->pml4, page->va, false);
+	}
+	pml4_clear_page(thread_current()->pml4, page->va);
 }
 
 static bool
@@ -67,6 +80,7 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	size_t read_bytes = length;
+	int page_cnt = length % PGSIZE ? length / PGSIZE + 1 : length / PGSIZE;
 
 	while (read_bytes > 0) {
 		/* Do calculate how to fill this page.
@@ -88,6 +102,7 @@ do_mmap (void *addr, size_t length, int writable,
 		}
 
 		/* Advance. */
+		spt_find_page(&thread_current()->spt, addr)->page_cnt = page_cnt;
 		read_bytes -= page_read_bytes;
 		addr += PGSIZE;
 		offset += page_read_bytes; 
@@ -98,4 +113,15 @@ do_mmap (void *addr, size_t length, int writable,
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+	struct page *upage = spt_find_page(&thread_current()->spt, addr);
+	int page_cnt = upage->page_cnt;
+
+	if (upage == NULL)
+		return NULL;
+	
+	for (int i = 0; i < page_cnt; i++) {
+		destroy(upage);
+		addr += PGSIZE;
+		upage = spt_find_page(&thread_current()->spt, addr);
+	}
 }

@@ -331,7 +331,7 @@ close (int fd) {
 
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
-	if (filesize(fd) == -1)
+	if (filesize(fd) == -1 || length == 0)
 		return NULL;
 	if (fd == 0 || fd == 1) // 표준 입출력 디스크립터 일 때
 		return NULL;
@@ -354,5 +354,12 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 
 void
 munmap (void *addr) {
+	if (!addr)
+		exit(-1);
+	if (!spt_find_page(&thread_current()->spt, addr))
+		exit(-1);
+	if (!is_user_vaddr(addr))
+		exit(-1);
 
+	do_munmap(addr);
 }

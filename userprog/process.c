@@ -23,13 +23,6 @@
 #include "vm/vm.h"
 #endif
 
-struct load_segment_aux {
-	struct file *file;
-	off_t ofs;
-	uint32_t read_bytes;
-	uint32_t zero_bytes;
-};
-
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);

@@ -45,18 +45,43 @@ syscall_init (void) {
 	lock_init(&filesys_lock);
 }
 
-bool
-is_valid_address(void *addr) {
-	if (addr == NULL || is_kernel_vaddr(addr) || (spt_find_page(&thread_current()->spt, addr) == NULL)) 
-		return false;
+#ifndef VM
+bool is_valid_address(void *addr) {
+    struct thread *curr = thread_current();
+    if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr->pml4, addr) == NULL)
+        return false;
 	return true;
 }
+#else
+struct page *is_valid_address(void *addr) {
+    struct thread *curr = thread_current();
+	char temp = *(char *)addr;
+
+    if (is_kernel_vaddr(addr) || addr == NULL)
+        return false;
+
+    return spt_find_page(&curr->spt, addr);
+}
+
+/* 버퍼 유효성 검사 */
+void check_valid_buffer(void *buffer, size_t size, bool writable) {
+    for (size_t i = 0; i < size; i++) {
+        /* buffer가 spt에 존재하는지 검사 */
+        struct page *page = is_valid_address(buffer + i);
+
+        if (!page || (writable && !(page->writable)))
+            exit(-1);
+    }
+}
+#endif
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
 	struct thread *curr = thread_current();
+	#ifdef VM
 	curr->user_rsp = f->rsp;
+	#endif
 
 	if (!is_valid_address(f->rsp)) 
 		thread_exit();
@@ -206,6 +231,9 @@ int filesize (int fd) {
 }
 
 int read (int fd, void *buffer, unsigned length) {
+	#ifdef VM
+    	check_valid_buffer(buffer, length, true);
+	#endif
 	if (fd < 0 || fd >= FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 
@@ -243,6 +271,9 @@ int read (int fd, void *buffer, unsigned length) {
 
 int
 write (int fd, const void *buffer, unsigned length) {
+	#ifdef VM
+    check_valid_buffer(buffer, length, false);
+	#endif
 	if (fd < 0 || fd >= FD_MAX || !is_valid_address(buffer))
 		exit(-1);
 

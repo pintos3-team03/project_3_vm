@@ -131,6 +131,12 @@ syscall_handler (struct intr_frame *f) {
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;
+		case SYS_MMAP:
+			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+			break;
+		case SYS_MUNMAP:
+			munmap(f->R.rdi);
+			break;
 		default:
 			thread_exit ();
 	}
@@ -321,4 +327,32 @@ close (int fd) {
 	curr_file = thread_current()->fd_table[fd];
 	thread_current()->fd_table[fd] = NULL;
 	file_close(curr_file);
+}
+
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+	if (filesize(fd) == -1)
+		return NULL;
+	if (fd == 0 || fd == 1) // 표준 입출력 디스크립터 일 때
+		return NULL;
+	if (!addr)
+		return NULL;
+	if (addr != pg_round_down(addr)) // addr이 페이지 정렬이 아닐 때
+		return NULL;
+	if (spt_find_page(&thread_current()->spt, addr)) // 기존에 매핑된 페이지랑 addr이 겹칠 때
+		return NULL;
+	if (offset != pg_round_down(offset))
+		return NULL;
+	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+		return NULL;		
+		
+	struct file *open_file = thread_current()->fd_table[fd];
+	if (open_file == NULL)
+		return NULL;
+	return do_mmap(addr, length, writable, open_file, offset);
+}
+
+void
+munmap (void *addr) {
+
 }

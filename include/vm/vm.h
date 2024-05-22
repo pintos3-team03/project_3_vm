@@ -59,6 +59,8 @@ struct page {
 		struct page_cache page_cache;
 #endif
 	};
+
+	int page_cnt;
 };
 
 /* The representation of "frame" */

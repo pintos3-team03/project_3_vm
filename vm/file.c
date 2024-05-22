@@ -31,10 +31,10 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	struct load_segment_aux *load_segment_aux = (struct load_segment_aux *)page->uninit.aux;
 	
 	// page->file에 파일 정보 저장
-	file_page = load_segment_aux->file;
-	file_page = load_segment_aux->ofs;
-	file_page = load_segment_aux->read_bytes;
-	file_page = load_segment_aux->zero_bytes;
+	file_page->file = load_segment_aux->file;
+	file_page->ofs = load_segment_aux->ofs;
+	file_page->read_bytes = load_segment_aux->read_bytes;
+	file_page->zero_bytes = load_segment_aux->zero_bytes;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -66,8 +66,9 @@ lazy_load_segment (struct page *page, void *aux) {
 	struct load_segment_aux *con = aux;
 
 	// 파일로부터 con->read_bytes만큼 데이터를 읽어 페이지 프레임에 씁니다.
-	if (file_read_at(con->file, page->frame->kva, con->read_bytes, con->ofs) != con->read_bytes)
+	if (file_read_at(con->file, page->frame->kva, con->read_bytes, con->ofs) != con->read_bytes){
 		return false;
+	}
 
 	// 페이지에 남은 부분은 0으로 초기화합니다.
 	memset(page->frame->kva + con->read_bytes, 0, con->zero_bytes);
@@ -80,10 +81,13 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	size_t read_bytes = length > file_length(file) ? file_length(file) : length;
-	size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
 	int page_cnt = length % PGSIZE ? length / PGSIZE + 1 : length / PGSIZE;
+	uint64_t ret = addr;	
+	
+    ASSERT(pg_ofs(addr) == 0);      // upage가 페이지 정렬되어 있는지 확인
+    ASSERT(offset % PGSIZE == 0); // ofs가 페이지 정렬되어 있는지 확인
 
-	while (read_bytes > 0 || zero_bytes > 0) {
+	while (read_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
@@ -92,6 +96,8 @@ do_mmap (void *addr, size_t length, int writable,
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		struct load_segment_aux *aux = (struct load_segment_aux *)malloc(sizeof(struct load_segment_aux));
+		if (!aux)
+			return NULL;
 		aux->file = file;
 		aux->ofs = offset;
 		aux->read_bytes = page_read_bytes;
@@ -103,13 +109,13 @@ do_mmap (void *addr, size_t length, int writable,
 		}
 
 		/* Advance. */
+		
 		spt_find_page(&thread_current()->spt, addr)->page_cnt = page_cnt;
 		read_bytes -= page_read_bytes;
-		zero_bytes -= page_zero_bytes;
 		addr += PGSIZE;
 		offset += page_read_bytes; 
 	}
-	return addr;
+	return ret;
 }
 
 /* Do the munmap */
@@ -117,9 +123,6 @@ void
 do_munmap (void *addr) {
 	struct page *upage = spt_find_page(&thread_current()->spt, addr);
 	int page_cnt = upage->page_cnt;
-
-	// if (upage == NULL)
-	// 	return NULL;
 	
 	for (int i = 0; i < page_cnt; i++) {
 		if (upage)

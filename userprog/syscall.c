@@ -341,12 +341,15 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 		return NULL;
 	if (offset != pg_round_down(offset) || offset % PGSIZE != 0)
         return NULL;
-	if (offset + length > filesize(fd))
-        return NULL;
-    
-	if (is_kernel_vaddr(addr) || is_kernel_vaddr((size_t)addr + length))
-		return NULL;	
 
+	// 커널 영역 접근 방지 (첫 번째 커널 주소 확인)
+    if (is_kernel_vaddr(addr))
+        return NULL;
+
+    // 커널 영역 접근 방지 (끝 주소가 커널 주소인지 확인)
+    void *end_addr = (void *)((size_t)addr + length);
+    if (is_kernel_vaddr(end_addr))
+        return NULL;
 
 	if (fd >= FD_MAX || thread_current()->fd_table[fd] == NULL)
         return NULL;	
@@ -355,7 +358,7 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	if (open_file == NULL || file_length(open_file) == 0 || (long)length <= 0)
 		return NULL;
 
-	void *end_addr = (void *)((size_t)addr + length);
+	// 기존에 매핑된 페이지와 겹치는지 확인
     for (void *page_addr = addr; page_addr < end_addr; page_addr += PGSIZE) {
         if (spt_find_page(&thread_current()->spt, page_addr))
             return NULL;

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "vm/vm.h"
 #include "include/threads/vaddr.h"
+#include "include/threads/mmu.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -55,7 +56,7 @@ file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
 
 	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
-		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->ofs);
+		file_write_at(file_page->file, page->frame->kva, file_page->read_bytes, file_page->ofs);
 		pml4_set_dirty(thread_current()->pml4, page->va, false);
 	}
 	pml4_clear_page(thread_current()->pml4, page->va);
@@ -111,7 +112,7 @@ do_mmap (void *addr, size_t length, int writable,
 
 		/* Advance. */
 		
-		spt_find_page(&thread_current()->spt, addr)->page_cnt = page_cnt;
+		spt_find_page(&thread_current()->spt, addr)->page_cnt = page_cnt--;
 		read_bytes -= page_read_bytes;
 		addr += PGSIZE;
 		offset += page_read_bytes; 
@@ -126,8 +127,10 @@ do_munmap (void *addr) {
 	int page_cnt = upage->page_cnt;
 	
 	for (int i = 0; i < page_cnt; i++) {
-		if (upage)
+		if (upage) {
 			destroy(upage);
+			// spt_remove_page(&thread_current()->spt, upage);
+		}
 		addr += PGSIZE;
 		upage = spt_find_page(&thread_current()->spt, addr);
 	}

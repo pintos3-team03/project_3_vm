@@ -13,6 +13,7 @@
 #include "threads/synch.h"
 #include "userprog/process.h"
 #include "threads/palloc.h"
+#include "vm/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -58,7 +59,7 @@ struct page *is_valid_address(void *addr) {
 	char temp = *(char *)addr;
 
     if (is_kernel_vaddr(addr) || addr == NULL)
-        return false;
+        return NULL;
 
     return spt_find_page(&curr->spt, addr);
 }
@@ -336,8 +337,10 @@ close (int fd) {
 
 	lock_acquire(&filesys_lock);
 	curr_file = thread_current()->fd_table[fd];
-	thread_current()->fd_table[fd] = NULL;
-	file_close(curr_file);
+	if (curr_file) {
+		thread_current()->fd_table[fd] = NULL;
+		file_close(curr_file);
+	}
 	lock_release(&filesys_lock);
 }
 

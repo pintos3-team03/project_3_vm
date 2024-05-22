@@ -79,10 +79,11 @@ lazy_load_segment (struct page *page, void *aux) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-	size_t read_bytes = length;
+	size_t read_bytes = length > file_length(file) ? file_length(file) : length;
+	size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
 	int page_cnt = length % PGSIZE ? length / PGSIZE + 1 : length / PGSIZE;
 
-	while (read_bytes > 0) {
+	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
@@ -104,6 +105,7 @@ do_mmap (void *addr, size_t length, int writable,
 		/* Advance. */
 		spt_find_page(&thread_current()->spt, addr)->page_cnt = page_cnt;
 		read_bytes -= page_read_bytes;
+		zero_bytes -= page_zero_bytes;
 		addr += PGSIZE;
 		offset += page_read_bytes; 
 	}
@@ -116,11 +118,12 @@ do_munmap (void *addr) {
 	struct page *upage = spt_find_page(&thread_current()->spt, addr);
 	int page_cnt = upage->page_cnt;
 
-	if (upage == NULL)
-		return NULL;
+	// if (upage == NULL)
+	// 	return NULL;
 	
 	for (int i = 0; i < page_cnt; i++) {
-		destroy(upage);
+		if (upage)
+			destroy(upage);
 		addr += PGSIZE;
 		upage = spt_find_page(&thread_current()->spt, addr);
 	}

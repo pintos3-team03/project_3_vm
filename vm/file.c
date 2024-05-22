@@ -80,9 +80,10 @@ lazy_load_segment (struct page *page, void *aux) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-	size_t read_bytes = length > file_length(file) ? file_length(file) : length;
+	struct file *re_file = file_reopen(file);
+	size_t read_bytes = length > file_length(re_file) ? file_length(re_file) : length;
 	int page_cnt = length % PGSIZE ? length / PGSIZE + 1 : length / PGSIZE;
-	uint64_t ret = addr;	
+	void *ret = addr;	
 	
     ASSERT(pg_ofs(addr) == 0);      // upage가 페이지 정렬되어 있는지 확인
     ASSERT(offset % PGSIZE == 0); // ofs가 페이지 정렬되어 있는지 확인
@@ -98,7 +99,7 @@ do_mmap (void *addr, size_t length, int writable,
 		struct load_segment_aux *aux = (struct load_segment_aux *)malloc(sizeof(struct load_segment_aux));
 		if (!aux)
 			return NULL;
-		aux->file = file;
+		aux->file = re_file;
 		aux->ofs = offset;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;

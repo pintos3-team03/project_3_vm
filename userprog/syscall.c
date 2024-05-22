@@ -182,8 +182,13 @@ create (const char *file, unsigned initial_size) {
 	if (!file || !is_valid_address(file))
 		exit(-1);
 
-	if (filesys_create(file, initial_size)) 
+	lock_acquire(&filesys_lock);
+	if (filesys_create(file, initial_size)) {
+		lock_release(&filesys_lock);
 		return true;
+	}
+
+	lock_release(&filesys_lock);
 	return false;
 }
 
@@ -192,9 +197,13 @@ remove (const char *file) {
 	if (!file || !is_valid_address(file))
 		exit(-1);
 
+	lock_acquire(&filesys_lock);
 	if (filesys_remove(file)) {
+		lock_release(&filesys_lock);
 		return true;
 	}
+
+	lock_release(&filesys_lock);
 	return false;
 }
 
@@ -230,9 +239,13 @@ int filesize (int fd) {
 	if (!fd || fd > FD_MAX)
 		exit(-1);
 	
+	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
-	if (open_file) 
+	if (open_file) {
+		lock_release(&filesys_lock);
 		return file_length(open_file);
+	}
+	lock_release(&filesys_lock);
 	return -1;
 }
 
@@ -301,32 +314,38 @@ write (int fd, const void *buffer, unsigned length) {
 }
 
 void seek (int fd, unsigned position) {
-	if (!fd || fd > FD_MAX)
+	if (!fd || fd > FD_MAX) 
 		exit(-1);
 	
+	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file)
 		file_seek(open_file, position);
+	lock_release(&filesys_lock);
 }
 
 unsigned tell (int fd) {
-	if (!fd || fd > FD_MAX)
+	if (!fd || fd > FD_MAX) 
 		exit(-1);
 	
+	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file)
 		file_tell(open_file);
+	lock_release(&filesys_lock);
 }
 
 void
 close (int fd) {
 	struct file *curr_file;
-	if (!fd || fd > FD_MAX)
+	if (!fd || fd > FD_MAX) 
 		exit(-1);
 
+	lock_acquire(&filesys_lock);
 	curr_file = thread_current()->fd_table[fd];
 	thread_current()->fd_table[fd] = NULL;
 	file_close(curr_file);
+	lock_release(&filesys_lock);
 }
 
 void *

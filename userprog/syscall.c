@@ -331,35 +331,47 @@ close (int fd) {
 
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
-	if (filesize(fd) == -1 || length == 0)
+	if (filesize(fd) <= 0 || length <= 0)
 		return NULL;
 	if (fd == 0 || fd == 1) // 표준 입출력 디스크립터 일 때
 		return NULL;
-	if (!addr)
-		return NULL;
-	if (addr != pg_round_down(addr)) // addr이 페이지 정렬이 아닐 때
+	if (!addr || addr != pg_round_down(addr)) // addr이 페이지 정렬이 아닐 때
 		return NULL;
 	if (spt_find_page(&thread_current()->spt, addr)) // 기존에 매핑된 페이지랑 addr이 겹칠 때
 		return NULL;
-	if (offset != pg_round_down(offset))
-		return NULL;
-	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
-		return NULL;		
+	if (offset != pg_round_down(offset) || offset % PGSIZE != 0)
+        return NULL;
+	if (offset + length > filesize(fd))
+        return NULL;
+    
+	if (is_kernel_vaddr(addr) || is_kernel_vaddr((size_t)addr + length))
+		return NULL;	
+
+
+	if (fd >= FD_MAX || thread_current()->fd_table[fd] == NULL)
+        return NULL;	
 		
 	struct file *open_file = thread_current()->fd_table[fd];
-	if (open_file == NULL)
+	if (open_file == NULL || file_length(open_file) == 0 || (long)length <= 0)
 		return NULL;
+
+	void *end_addr = (void *)((size_t)addr + length);
+    for (void *page_addr = addr; page_addr < end_addr; page_addr += PGSIZE) {
+        if (spt_find_page(&thread_current()->spt, page_addr))
+            return NULL;
+    }
+		
 	return do_mmap(addr, length, writable, open_file, offset);
 }
 
 void
 munmap (void *addr) {
-	if (!addr)
-		exit(-1);
-	if (!spt_find_page(&thread_current()->spt, addr))
-		exit(-1);
-	if (!is_user_vaddr(addr))
-		exit(-1);
+	// if (!addr)
+	// 	exit(-1);
+	// if (!spt_find_page(&thread_current()->spt, addr))
+	// 	exit(-1);
+	// if (!is_user_vaddr(addr))
+	// 	exit(-1);
 
 	do_munmap(addr);
 }

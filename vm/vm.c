@@ -317,6 +317,21 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 				return false;
 			continue;
 		}
+		if (type == VM_FILE)
+        {
+            struct load_segment_aux *file_aux = malloc(sizeof(struct load_segment_aux));
+            file_aux->file = parent_page->file.file;
+            file_aux->ofs = parent_page->file.ofs;
+            file_aux->read_bytes = parent_page->file.read_bytes;
+            file_aux->zero_bytes = parent_page->file.zero_bytes;
+            if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux))
+                return false;
+            struct page *file_page = spt_find_page(dst, upage);
+            file_backed_initializer(file_page, type, NULL);
+            file_page->frame = parent_page->frame;
+            pml4_set_page(thread_current()->pml4, file_page->va, parent_page->frame->kva, parent_page->writable);
+            continue;
+        }
 
 		/* src copy */
 		if (!vm_alloc_page(type, upage, writable)) // upage를 uninit page으로 초기화 + 자식 spt에 insert

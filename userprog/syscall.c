@@ -239,13 +239,10 @@ int filesize (int fd) {
 	if (!fd || fd > FD_MAX)
 		exit(-1);
 	
-	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file) {
-		lock_release(&filesys_lock);
 		return file_length(open_file);
 	}
-	lock_release(&filesys_lock);
 	return -1;
 }
 
@@ -317,22 +314,18 @@ void seek (int fd, unsigned position) {
 	if (!fd || fd > FD_MAX) 
 		exit(-1);
 	
-	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file)
 		file_seek(open_file, position);
-	lock_release(&filesys_lock);
 }
 
 unsigned tell (int fd) {
 	if (!fd || fd > FD_MAX) 
 		exit(-1);
 	
-	lock_acquire(&filesys_lock);
 	struct file *open_file = thread_current()->fd_table[fd];
 	if (open_file)
 		file_tell(open_file);
-	lock_release(&filesys_lock);
 }
 
 void
@@ -388,12 +381,5 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 
 void
 munmap (void *addr) {
-	// if (!addr)
-	// 	exit(-1);
-	// if (!spt_find_page(&thread_current()->spt, addr))
-	// 	exit(-1);
-	// if (!is_user_vaddr(addr))
-	// 	exit(-1);
-
 	do_munmap(addr);
 }

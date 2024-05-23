@@ -133,8 +133,18 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
+	struct thread *curr = thread_current();
+	
+	struct list_elem *e = list_begin(&frame_table);
+	for (e; e != list_end(&frame_table); e = list_next(e)) {
+		victim = list_entry(e, struct frame, frame_elem);
+		if (pml4_is_accessed(curr->pml4, victim->page->va))
+			pml4_set_accessed(curr->pml4, victim->page->va, false);
+        else
+            return victim;
+	}
 
-	return victim;
+	return list_entry(list_begin(&frame_table), struct frame, frame_elem);
 }
 
 /* Evict one page and return the corresponding frame.
@@ -143,8 +153,12 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+	if (victim->page)
+        swap_out(victim->page);
+	victim->page=NULL;
+	memset(victim->kva,0,PGSIZE);
 
-	return NULL;
+    return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -160,17 +174,23 @@ vm_get_frame (void) {
 	struct frame *frame = calloc(1, sizeof(struct frame));
 	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
 	if (kva == NULL) {
-		PANIC("TODO: swap out");
+		// PANIC("TODO: swap out");
+		frame = vm_evict_frame();
+
+		// frame->page = NULL;
+		// return frame;
+	} else {
+		frame->kva = kva;
+		list_push_back(&frame_table, &frame->frame_elem);
 	}
-	
-	frame->kva = kva;
+
 	frame->page = NULL;
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 
 	/* frame table에 frame 추가 */
-	list_push_front(&frame_table, &frame->frame_elem);
+	// list_push_front(&frame_table, &frame->frame_elem);
 
 	return frame;
 }
@@ -304,7 +324,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		bool writable = src_page->writable;
 
 		/* 1) type이 uninit이면 */
-		if (type == VM_UNINIT)
+		if (VM_TYPE(type) == VM_UNINIT)
 		{ // uninit page 생성 & 초기화
 			vm_initializer *init = src_page->uninit.init;
 			void *aux = src_page->uninit.aux;
@@ -313,7 +333,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		}
 
 		/* 2) type이 file이면 */
-		if (type == VM_FILE)
+		if (VM_TYPE(type) == VM_FILE)
 		{
 			struct load_segment_aux *file_aux = malloc(sizeof(struct load_segment_aux));
 			file_aux->file = src_page->file.file;

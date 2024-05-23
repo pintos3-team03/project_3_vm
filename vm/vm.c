@@ -86,6 +86,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		uninit_new(new_page, upage, init, type, aux, page_initializer);
 
 		new_page->writable = writable;
+		new_page->pml4 = thread_current()->pml4;
 		if (!spt_insert_page(spt, new_page)) {
 			free(new_page);
 			return false;
@@ -133,15 +134,15 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-	struct thread *curr = thread_current();
-	
 	struct list_elem *e = list_begin(&frame_table);
 	for (e; e != list_end(&frame_table); e = list_next(e)) {
 		victim = list_entry(e, struct frame, frame_elem);
-		if (pml4_is_accessed(curr->pml4, victim->page->va))
-			pml4_set_accessed(curr->pml4, victim->page->va, false);
-        else
-            return victim;
+		
+		// second-chance 알고리즘
+		if (pml4_is_accessed(victim->page->pml4, victim->page->va))
+			pml4_set_accessed(victim->page->pml4, victim->page->va, false);
+		else
+			return victim;
 	}
 
 	return list_entry(list_begin(&frame_table), struct frame, frame_elem);
@@ -154,9 +155,9 @@ vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 	if (victim->page)
-        swap_out(victim->page);
-	victim->page=NULL;
-	memset(victim->kva,0,PGSIZE);
+		swap_out(victim->page);
+	victim->page = NULL;
+	memset(victim->kva, 0, PGSIZE);
 
     return victim;
 }
@@ -174,23 +175,16 @@ vm_get_frame (void) {
 	struct frame *frame = calloc(1, sizeof(struct frame));
 	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
 	if (kva == NULL) {
-		// PANIC("TODO: swap out");
+		free(frame);
 		frame = vm_evict_frame();
-
-		// frame->page = NULL;
-		// return frame;
 	} else {
 		frame->kva = kva;
 		list_push_back(&frame_table, &frame->frame_elem);
 	}
-
 	frame->page = NULL;
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
-
-	/* frame table에 frame 추가 */
-	// list_push_front(&frame_table, &frame->frame_elem);
 
 	return frame;
 }

@@ -1,5 +1,6 @@
 /* anon.c: Implementation of page for non-disk image (a.k.a. anonymous page). */
 #include <bitmap.h>
+#include <string.h>
 #include "vm/vm.h"
 #include "devices/disk.h"
 #include "include/threads/mmu.h"
@@ -25,9 +26,9 @@ size_t slot_max;
 void
 vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
-	swap_disk = disk_get(1, 1);
-    slot_max = disk_size(swap_disk) / SLOT_SIZE;
-    swap_table = bitmap_create(slot_max);
+	swap_disk = disk_get(1, 1); // Get swap disk
+	slot_max = disk_size(swap_disk) / SLOT_SIZE;
+	swap_table = bitmap_create(slot_max);
 }
 
 /* Initialize the file mapping */
@@ -35,8 +36,7 @@ bool
 anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	struct uninit_page *uninit = &page->uninit;
 	memset(uninit, 0, sizeof(struct uninit_page));
-	
-	/* Set up the handler */
+
 	page->operations = &anon_ops;
 
 	struct anon_page *anon_page = &page->anon;
@@ -50,16 +50,15 @@ static bool
 anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
 
-	size_t slot = anon_page->slot;
-	size_t sector_num = slot * SLOT_SIZE;
-	if (slot == BITMAP_ERROR || !bitmap_test(swap_table, slot))
+	size_t slot_idx = anon_page->slot;
+
+	if (slot_idx == BITMAP_ERROR || !bitmap_test(swap_table, slot_idx)) // 스왑 슬롯이 진짜 사용 중인지 체크
 		return false;
 
-	// 스왑 디스크의 내용을 메모리로 읽는다.
 	for (int i = 0; i < SLOT_SIZE; i++)
-		disk_read(swap_disk, sector_num + i, kva + i * DISK_SECTOR_SIZE);
-	
-	bitmap_set(swap_table, slot, false);
+		disk_read(swap_disk, (slot_idx * SLOT_SIZE) + i, kva + (DISK_SECTOR_SIZE * i));
+
+	bitmap_set(swap_table, slot_idx, false);
 	
 	return true;
 }
@@ -69,23 +68,22 @@ static bool
 anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 
-	// page에 연결된 프레임을 디스크로 옮긴다.
-	// 1. 스왑 테이블에서 옮길 수 있는 스왑 슬롯 찾기
+	// 스왑 테이블에서 사용 가능한 스왑 슬롯 찾기
 	size_t free_idx = bitmap_scan_and_flip(swap_table, 0, 1, false);
 	if (free_idx == BITMAP_ERROR)
-		return false; // 디스크에 여유 스왑 슬롯이 없으면 PANIC 
-	size_t sector_num = free_idx * SLOT_SIZE;
-	
-	// 2. 페이지의 데이터를 스왑 슬롯에 복사
+		return false;
+	// 페이지 크기는 4096바이트, 섹터 크기는 512바이트라 8개의 섹터에 페이지를 넣어야 함
 	for (int i = 0; i < SLOT_SIZE; i++)
-		disk_write(swap_disk, sector_num + i, page->frame->kva + i * DISK_SECTOR_SIZE);
+		disk_write(swap_disk, (free_idx * SLOT_SIZE) + i, page->frame->kva + (DISK_SECTOR_SIZE * i));
 
 	anon_page->slot = free_idx;
 
-	// 3. pml4에서 page->va와 page->frame->kva의 연결을 끊는다.
+	bitmap_set(swap_table, free_idx, true);
+	// 페이지와 프레임의 매핑 끊기
 	page->frame->page = NULL;
 	page->frame = NULL;
 	pml4_clear_page(thread_current()->pml4, page->va);
+
 	return true;
 }
 

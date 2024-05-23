@@ -61,6 +61,7 @@ struct page {
 	};
 
 	int page_cnt;
+	void *pml4;
 };
 
 /* The representation of "frame" */

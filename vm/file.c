@@ -82,8 +82,10 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	struct file *re_file = file_reopen(file);
-	size_t read_bytes = length > file_length(re_file) ? file_length(re_file) : length;
-	int page_cnt = length % PGSIZE ? length / PGSIZE + 1 : length / PGSIZE;
+	// size_t read_bytes = length > file_length(re_file) ? file_length(re_file) : length;
+	size_t read_bytes = length;
+	// int page_cnt = length % PGSIZE ? length / PGSIZE + 1 : length / PGSIZE;
+	int page_cnt = (size_t)pg_round_up(read_bytes) / PGSIZE;
 	void *ret = addr;	
 	
     ASSERT(pg_ofs(addr) == 0);      // upage가 페이지 정렬되어 있는지 확인
@@ -104,7 +106,6 @@ do_mmap (void *addr, size_t length, int writable,
 		aux->ofs = offset;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;
-
 		if (!vm_alloc_page_with_initializer (VM_FILE, addr,
 					writable, lazy_load_segment, aux)) {
 			return NULL;

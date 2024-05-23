@@ -301,51 +301,33 @@ page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNU
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	struct hash *src_spt = &src->spt_table;
 	struct hash_iterator hash_i;
-	hash_first(&hash_i, src_spt);
+	// struct hash *src_spt = &src->spt_table;
+	hash_first(&hash_i, &src->spt_table);
 
 	while (hash_next(&hash_i)) {
 		struct page *parent_page = hash_entry(hash_cur(&hash_i), struct page, hash_elem);
-		struct page *upage = parent_page->va;
+		void *upage = parent_page->va;
+		struct load_segment_aux *aux = parent_page->uninit.aux;
 		enum vm_type type = parent_page->operations->type;
 		bool writable = parent_page->writable;
 
-		if (type == VM_UNINIT) {
-			void *aux = parent_page->uninit.aux;
+		if (VM_TYPE(type) == VM_UNINIT) {
 			if (!vm_alloc_page_with_initializer(parent_page->uninit.type, upage, writable, parent_page->uninit.init, aux))
 				return false;
 			continue;
 		}
-		if (type == VM_FILE)
-        {
-            struct load_segment_aux *file_aux = malloc(sizeof(struct load_segment_aux));
-            file_aux->file = parent_page->file.file;
-            file_aux->ofs = parent_page->file.ofs;
-            file_aux->read_bytes = parent_page->file.read_bytes;
-            file_aux->zero_bytes = parent_page->file.zero_bytes;
-            if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux))
-                return false;
+		else {
+			/* src copy */
+			if (!vm_alloc_page(type, upage, writable)) // upage를 uninit page으로 초기화 + 자식 spt에 insert
+				return false;
 
-            struct page *file_page = spt_find_page(dst, upage);
-            file_backed_initializer(file_page, type, NULL);
-            file_page->frame = parent_page->frame;
-            pml4_set_page(thread_current()->pml4, file_page->va, parent_page->frame->kva, parent_page->writable);
-            
+			if (!vm_claim_page(upage)) // 자식 페이지의 프레임 할당
+				return false;
+
 			struct page *child_page = spt_find_page(dst, upage);
 			memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
-			continue;
-        }
-
-		/* src copy */
-		if (!vm_alloc_page(type, upage, writable)) // upage를 uninit page으로 초기화 + 자식 spt에 insert
-			return false;
-
-		if (!vm_claim_page(upage)) // 자식 페이지의 프레임 할당
-			return false;
-
-		struct page *child_page = spt_find_page(dst, upage);
-		memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+		}
 	}
 	return true;
 }

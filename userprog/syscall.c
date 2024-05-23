@@ -66,7 +66,7 @@ struct page *is_valid_address(void *addr) {
 
 /* 버퍼 유효성 검사 */
 void check_valid_buffer(void *buffer, size_t size, bool writable) {
-    for (size_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i+=8 ){
         /* buffer가 spt에 존재하는지 검사 */
         struct page *page = is_valid_address(buffer + i);
 
@@ -151,6 +151,7 @@ halt (void) {
 void
 exit (int status) {
 	thread_current()->exit_status = status;
+	printf("%s: exit(%d)\n", thread_current()->name, thread_current()->exit_status);
 	thread_exit();
 }
 

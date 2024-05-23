@@ -92,15 +92,15 @@ anon_swap_out (struct page *page) {
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
 static void
 anon_destroy (struct page *page) {
-	struct anon_page *anon_page = &page->anon;
+	// struct anon_page *anon_page = &page->anon;
 
-	if (anon_page->slot != BITMAP_ERROR)
-		bitmap_reset(swap_table, anon_page->slot);
+	// if (anon_page->slot != BITMAP_ERROR)
+	// 	bitmap_reset(swap_table, anon_page->slot);
 
-	if (page->frame) {
-		list_remove(&page->frame->frame_elem);
-		free(page->frame);
-		page->frame = NULL;
-	}
-	pml4_clear_page(thread_current()->pml4, page->va);
+	// if (page->frame) {
+	// 	list_remove(&page->frame->frame_elem);
+	// 	free(page->frame);
+	// 	page->frame = NULL;
+	// }
+	// pml4_clear_page(thread_current()->pml4, page->va);
 }

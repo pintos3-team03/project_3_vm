@@ -284,9 +284,17 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	printf("%s: exit(%d)\n", thread_current()->name, thread_current()->exit_status);
+	// printf("%s: exit(%d)\n", thread_current()->name, thread_current()->exit_status);
 	// 프로세스 종료 시 프로세스에 열려있는 모든 파일 닫기
 	file_close(curr->run_file);
+
+	struct list_elem *child;
+    for (child = list_begin(&thread_current()->child_list); // childs 순회
+         child != list_end(&thread_current()->child_list); child = list_next(child))
+    {
+        struct thread *t = list_entry(child, struct thread, child_elem);
+        sema_up(&t->sema_exit);
+    }
 
 	for (int i = 0; i < curr->fd_max; i++) {
 		if (curr->fd_table[i] != NULL)
@@ -294,6 +302,12 @@ process_exit (void) {
 	}
 
 	process_cleanup ();
+
+	sema_up(&thread_current()->sema_wait);
+	sema_down(&thread_current()->sema_exit);
+	// 자식 프로세스 디스크립터 삭제
+	list_remove(&thread_current()->child_elem);
+	thread_current()->is_exit = 1;
 }
 
 /* Free the current process's resources. */
@@ -794,21 +808,23 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (struct intr_frame *if_) {
 	bool success = false;
-	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
+    void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
 
-	/* TODO: Map the stack on stack_bottom and claim the page immediately.
-	 * TODO: If success, set the rsp accordingly.
-	 * TODO: You should mark the page is stack. */
-	/* TODO: Your code goes here */
-	/* 스택을 stack_bottom에 매핑하고 즉시 페이지를 확보합니다. */
-	/* 성공하면 rsp를 적절히 설정합니다. */
-	/* 페이지를 스택으로 표시해야 합니다. */
-	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {
-		success = vm_claim_page(stack_bottom);
-		if (success)
-			if_->rsp = USER_STACK;
-	}
+    /* TODO: Map the stack on stack_bottom and claim the page immediately.
+     * TODO: If success, set the rsp accordingly.
+     * TODO: You should mark the page is stack. */
+    /* TODO: Your code goes here */
+    if (!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
+        return success;
 
-	return success;
+    if (!vm_claim_page(stack_bottom)) {
+        // vm_dealloc_page(stack_bottom);
+        return success;
+    }
+
+    if_->rsp = USER_STACK;
+    thread_current()->stack_bottom = stack_bottom;
+    success = true;
+    return success;
 }
 #endif /* VM */

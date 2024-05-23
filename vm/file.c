@@ -54,7 +54,6 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-
 	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
 		file_write_at(file_page->file, page->frame->kva, file_page->read_bytes, file_page->ofs);
 		pml4_set_dirty(thread_current()->pml4, page->va, false);

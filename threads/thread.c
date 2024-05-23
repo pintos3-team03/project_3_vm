@@ -301,11 +301,6 @@ thread_exit (void) {
 	ASSERT (!intr_context ());
 
 #ifdef USERPROG
-	sema_up(&thread_current()->sema_wait);
-	sema_down(&thread_current()->sema_exit);
-	// 자식 프로세스 디스크립터 삭제
-	list_remove(&thread_current()->child_elem);
-	thread_current()->is_exit = 1;
 	process_exit ();
 #endif
 

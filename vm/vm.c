@@ -86,6 +86,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		uninit_new(new_page, upage, init, type, aux, page_initializer);
 
 		new_page->writable = writable;
+		new_page->pml4 = thread_current()->pml4;
 		if (!spt_insert_page(spt, new_page)) {
 			free(new_page);
 			return false;
@@ -138,8 +139,8 @@ vm_get_victim (void) {
 	struct list_elem *e = list_begin(&frame_table);
 	for (e; e != list_end(&frame_table); e = list_next(e)) {
 		victim = list_entry(e, struct frame, frame_elem);
-		if (pml4_is_accessed(curr->pml4, victim->page->va))
-			pml4_set_accessed(curr->pml4, victim->page->va, false);
+		if (pml4_is_accessed(victim->page->pml4, victim->page->va))
+			pml4_set_accessed(victim->page->pml4, victim->page->va, false);
         else
             return victim;
 	}
@@ -283,7 +284,7 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	pml4_set_page(curr->pml4, page->va, frame->kva, page->writable); // (va - pa) mapping
+	pml4_set_page(page->pml4, page->va, frame->kva, page->writable); // (va - pa) mapping
 
 	return swap_in (page, frame->kva);
 }

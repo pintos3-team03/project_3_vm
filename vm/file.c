@@ -69,25 +69,25 @@ file_backed_swap_out (struct page *page) {
 	if (page == NULL)
 		return false;
 	
-	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
+	if (pml4_is_dirty(page->pml4, page->va)) {
 		file_write_at(file_page->file, page->frame->kva, file_page->read_bytes, file_page->ofs);
-		pml4_set_dirty(thread_current()->pml4, page->va, false);
+		pml4_set_dirty(page->pml4, page->va, false);
 	}
 	page->frame->page = NULL;
 	page->frame = NULL;
-
-	pml4_clear_page(thread_current()->pml4, page->va);
+	pml4_clear_page(page->pml4, page->va);
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
+	if (pml4_is_dirty(page->pml4, page->va)) {
 		file_write_at(file_page->file, page->frame->kva, file_page->read_bytes, file_page->ofs);
-		pml4_set_dirty(thread_current()->pml4, page->va, false);
+		pml4_set_dirty(page->pml4, page->va, false);
 	}
-	pml4_clear_page(thread_current()->pml4, page->va);
+
+	pml4_clear_page(page->pml4, page->va);
 }
 
 /* Do the mmap */

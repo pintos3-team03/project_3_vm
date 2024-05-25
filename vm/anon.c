@@ -85,22 +85,23 @@ anon_swap_out (struct page *page) {
 	// 3. pml4에서 page->va와 page->frame->kva의 연결을 끊는다.
 	page->frame->page = NULL;
 	page->frame = NULL;
-	pml4_clear_page(thread_current()->pml4, page->va);
+	pml4_clear_page(page->pml4, page->va);
 	return true;
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
 static void
 anon_destroy (struct page *page) {
-	// struct anon_page *anon_page = &page->anon;
+	struct anon_page *anon_page = &page->anon;
 
-	// if (anon_page->slot != BITMAP_ERROR)
-	// 	bitmap_reset(swap_table, anon_page->slot);
+	if (anon_page->slot != BITMAP_ERROR)
+		bitmap_reset(swap_table, anon_page->slot);
 
-	// if (page->frame) {
-	// 	list_remove(&page->frame->frame_elem);
-	// 	free(page->frame);
-	// 	page->frame = NULL;
-	// }
-	// pml4_clear_page(thread_current()->pml4, page->va);
+	if (page->frame) {
+		list_remove(&page->frame->frame_elem);
+		free(page->frame);
+		page->frame = NULL;
+	}
+	
+	// pml4_clear_page(page->pml4, page->va);
 }

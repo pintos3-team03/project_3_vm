@@ -407,6 +407,62 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
+static 
+int argument_passing(const char *parsing_ptr, char *next_ptr, char **rsp, char **extend_rsp) {
+    char *temp_rsp = *rsp;
+    char *token;
+    int cnt = 1;
+    size_t size_argv;
+
+    // Calculate the necessary size to align the stack to an 8-byte boundary
+    size_argv = strlen(parsing_ptr) + 1 + strlen(next_ptr) + 1;
+    if (size_argv % 8 != 0)
+        size_argv = ((size_argv / 8) + 1) * 8;
+    *extend_rsp = *rsp - size_argv;
+
+    // Align the stack boundary
+    *extend_rsp -= 8;
+    **extend_rsp = 0;
+
+    // Parse the command arguments and push them onto the stack
+    token = strrchr(next_ptr, ' ');
+
+    if (strlen(next_ptr) > 0) {
+        while (token) {
+            token += 1;
+            
+            temp_rsp -= strlen(token) + 1;
+            memcpy(temp_rsp, token, strlen(token) + 1);
+            *extend_rsp -= 8;
+            memcpy(*extend_rsp, &temp_rsp, 8);
+
+            while (*(token - 1) == ' ') {
+                token -= 1;
+                *token = '\0';
+            }
+            token = strrchr(next_ptr, ' ');
+            cnt += 1;
+        }
+        token = next_ptr;
+        cnt += 1;
+        temp_rsp -= strlen(token) + 1;
+        memcpy(temp_rsp, token, strlen(token) + 1);
+        *extend_rsp -= 8;
+        memcpy(*extend_rsp, &temp_rsp, 8);
+    }
+
+    // Push the file name (path) onto the stack
+    temp_rsp -= strlen(parsing_ptr) + 1;
+    memcpy(temp_rsp, parsing_ptr, strlen(parsing_ptr) + 1);
+
+    *extend_rsp -= 8;
+    memcpy(*extend_rsp, &temp_rsp, 8);
+
+    // Update the rsp and extend_rsp pointers
+    *rsp = temp_rsp;
+    return cnt;
+}
+
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
@@ -519,56 +575,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/* passing */
-	// 스택 크기 늘려주기 (첫 푸시 전에 8의 배수로 맞춰주기)
-	temp_rsp = if_->rsp; // 이전 rsp 저장
-	size_argv = strlen(parsing_ptr) + 1 + strlen(next_ptr) + 1;
-	if (size_argv % 8 != 0)
-		size_argv = ((size_argv / 8) + 1) * 8;
-	extend_rsp = if_->rsp - size_argv;
-
-	// 경계 설정
-	extend_rsp -= 8;
-	*extend_rsp = 0;
-
-	// 명령어 파싱
-	char *token = strrchr(next_ptr, ' ');
-
-	if (strlen(next_ptr) > 0) {
-		// 파싱 데이터 푸시, 해당 데이터 주소도 스택에 푸시
-		while (token) {
-			token += 1;
-			
-			temp_rsp -= strlen(token) + 1;
-			memcpy(temp_rsp, token, strlen(token) + 1);
-			extend_rsp -= 8;
-			memcpy(extend_rsp, &temp_rsp, 8);
-
-			while (*(token - 1) == ' ') {
-				token -= 1;
-				*token = '\0';
-			}
-			token = strrchr(next_ptr, ' ');
-			cnt += 1;
-		}
-		token = next_ptr;
-		cnt += 1;
-		temp_rsp -= strlen(token) + 1;
-		memcpy(temp_rsp, token, strlen(token) + 1);
-		extend_rsp -= 8;
-		memcpy(extend_rsp, &temp_rsp, 8);
-	}
-
-	// 먼저 찾아둔 file name(경로)도 스택에 푸시
-	temp_rsp -= strlen(parsing_ptr) + 1;
-	memcpy(temp_rsp, parsing_ptr, strlen(parsing_ptr) + 1);
-
-	extend_rsp -= 8;
-	memcpy(extend_rsp, &temp_rsp, 8);
-
+	/* Argument passing */
+	cnt = argument_passing(parsing_ptr, next_ptr, &if_->rsp, &extend_rsp);
 	if_->R.rdi = cnt; // 파싱 개수 rdi에 넣어줌 (argc 설정)
 	if_->R.rsi = extend_rsp; // rsi가 argv의 주소를 가리키게 설정
-	// return address 설정
+
+	// Set return address
 	extend_rsp -= 8;
 	*extend_rsp = 0;
 	if_->rsp = extend_rsp;

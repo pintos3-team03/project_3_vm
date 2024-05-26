@@ -351,7 +351,7 @@ void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	if (filesize(fd) <= 0 || length <= 0)
 		return NULL;
-	if (fd == 0 || fd == 1) // 표준 입출력 디스크립터 일 때
+	if (fd <= 2) // 표준 입출력 디스크립터 일 때
 		return NULL;
 	if (!addr || addr != pg_round_down(addr)) // addr이 페이지 정렬이 아닐 때
 		return NULL;
